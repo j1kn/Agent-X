@@ -1,47 +1,85 @@
-// Telegram OAuth uses Telegram Login Widget
-// https://core.telegram.org/widgets/login
+// Telegram Bot API - Bot Token flow for channel posting
+// https://core.telegram.org/bots/api
 
-export interface TelegramAuthData {
-  id: number
-  first_name: string
-  last_name?: string
-  username?: string
-  photo_url?: string
-  auth_date: number
-  hash: string
+export interface TelegramBotInfo {
+  ok: boolean
+  result: {
+    id: number
+    is_bot: boolean
+    first_name: string
+    username: string
+    can_join_groups: boolean
+    can_read_all_group_messages: boolean
+    supports_inline_queries: boolean
+  }
 }
 
-export function verifyTelegramAuth(
-  authData: TelegramAuthData,
-  botToken: string
-): boolean {
-  const crypto = require('crypto')
-
-  // Create data-check-string
-  const dataCheckArr: string[] = []
-  Object.keys(authData).forEach((key) => {
-    if (key !== 'hash') {
-      dataCheckArr.push(`${key}=${(authData as any)[key]}`)
-    }
-  })
-  dataCheckArr.sort()
-  const dataCheckString = dataCheckArr.join('\n')
-
-  // Create secret key
-  const secretKey = crypto.createHash('sha256').update(botToken).digest()
-
-  // Calculate hash
-  const hash = crypto
-    .createHmac('sha256', secretKey)
-    .update(dataCheckString)
-    .digest('hex')
-
-  // Verify hash matches
-  return hash === authData.hash
+export interface TelegramChatInfo {
+  ok: boolean
+  result: {
+    id: number
+    title: string
+    username?: string
+    type: string
+  }
 }
 
-export function getTelegramOAuthUrl(botUsername: string, redirectUrl: string): string {
-  // Telegram Login Widget URL
-  return `https://oauth.telegram.org/auth?bot_id=${botUsername}&origin=${encodeURIComponent(redirectUrl)}&request_access=write`
+/**
+ * Verify bot token is valid by calling getMe
+ */
+export async function verifyBotToken(botToken: string): Promise<TelegramBotInfo> {
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`)
+  const data = await response.json()
+  
+  if (!data.ok) {
+    throw new Error('Invalid bot token')
+  }
+  
+  return data
+}
+
+/**
+ * Get chat info by username (channel or group)
+ */
+export async function getChatInfo(
+  botToken: string,
+  channelUsername: string
+): Promise<TelegramChatInfo> {
+  // Remove @ if present
+  const username = channelUsername.startsWith('@') 
+    ? channelUsername.substring(1) 
+    : channelUsername
+  
+  const response = await fetch(
+    `https://api.telegram.org/bot${botToken}/getChat?chat_id=@${username}`
+  )
+  const data = await response.json()
+  
+  if (!data.ok) {
+    throw new Error('Cannot access channel - ensure bot is added as admin')
+  }
+  
+  return data
+}
+
+/**
+ * Check if bot is an admin in the channel
+ */
+export async function checkBotIsAdmin(
+  botToken: string,
+  chatId: number,
+  botId: number
+): Promise<boolean> {
+  const response = await fetch(
+    `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${chatId}&user_id=${botId}`
+  )
+  const data = await response.json()
+  
+  if (!data.ok) {
+    return false
+  }
+  
+  const status = data.result.status
+  return status === 'administrator' || status === 'creator'
 }
 

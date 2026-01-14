@@ -1,12 +1,29 @@
 // X (Twitter) OAuth 2.0
 // https://developer.twitter.com/en/docs/authentication/oauth-2-0
 
+import crypto from 'crypto'
+
+/**
+ * Generate PKCE code verifier and challenge
+ */
+export function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
+  const codeVerifier = crypto.randomBytes(32).toString('base64url')
+  const codeChallenge = crypto
+    .createHash('sha256')
+    .update(codeVerifier)
+    .digest('base64url')
+  
+  return { codeVerifier, codeChallenge }
+}
+
 export function getXOAuthUrl(
   clientId: string,
   redirectUri: string,
-  state: string
+  state: string,
+  codeChallenge: string
 ): string {
-  const scope = 'tweet.read tweet.write users.read offline.access'
+  // Required scopes for posting and reading user info
+  const scope = 'tweet.write users.read offline.access'
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -14,8 +31,8 @@ export function getXOAuthUrl(
     redirect_uri: redirectUri,
     scope,
     state,
-    code_challenge: 'challenge', // In production, use PKCE
-    code_challenge_method: 'plain',
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
   })
 
   return `https://twitter.com/i/oauth2/authorize?${params.toString()}`
@@ -25,7 +42,8 @@ export async function exchangeXCodeForToken(
   code: string,
   clientId: string,
   clientSecret: string,
-  redirectUri: string
+  redirectUri: string,
+  codeVerifier: string
 ): Promise<{
   access_token: string
   refresh_token: string
@@ -41,7 +59,7 @@ export async function exchangeXCodeForToken(
       grant_type: 'authorization_code',
       code,
       redirect_uri: redirectUri,
-      code_verifier: 'challenge', // In production, use PKCE
+      code_verifier: codeVerifier,
     }),
   })
 

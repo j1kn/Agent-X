@@ -16,15 +16,20 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Decode state to get user ID
-    const { userId } = JSON.parse(Buffer.from(state, 'base64').toString())
+    // Decode state to get user ID and code verifier
+    const { userId, codeVerifier } = JSON.parse(Buffer.from(state, 'base64').toString())
 
-    // Exchange code for token
+    if (!codeVerifier) {
+      return NextResponse.redirect(`${origin}/accounts?error=invalid_state`)
+    }
+
+    // Exchange code for token with PKCE code verifier
     const tokenData = await exchangeXCodeForToken(
       code,
       process.env.X_CLIENT_ID!,
       process.env.X_CLIENT_SECRET!,
-      `${origin}/api/accounts/callback/x`
+      `${origin}/api/accounts/callback/x`,
+      codeVerifier
     )
 
     // Get user info
@@ -53,13 +58,15 @@ export async function GET(request: Request) {
       })
 
     if (error) {
+      console.error('Database error:', error)
       return NextResponse.redirect(`${origin}/accounts?error=db_error`)
     }
 
     return NextResponse.redirect(`${origin}/accounts?success=x_connected`)
   } catch (error) {
     console.error('X OAuth error:', error)
-    return NextResponse.redirect(`${origin}/accounts?error=oauth_failed`)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.redirect(`${origin}/accounts?error=${encodeURIComponent(message)}`)
   }
 }
 
