@@ -23,20 +23,35 @@ export async function POST(request: Request) {
 
   // X OAuth Flow
   if (platform === 'x') {
+    console.log('=== Initiating X OAuth 2.0 Flow ===')
+    
     const clientId = process.env.X_CLIENT_ID!
-    if (!clientId) {
+    const clientSecret = process.env.X_CLIENT_SECRET!
+    
+    if (!clientId || !clientSecret) {
+      console.error('X OAuth credentials missing!')
       return NextResponse.json({ error: 'X OAuth not configured' }, { status: 500 })
     }
 
+    // Build redirect URI - MUST match exactly what's in X Developer Portal
     const origin = new URL(request.url).origin
     const redirectUri = `${origin}/api/accounts/callback/x`
+    
+    console.log('Redirect URI:', redirectUri)
+    console.log('⚠️  VERIFY: This MUST match exactly in X Developer Portal → App Settings → Callback URLs')
 
     // Generate PKCE challenge
     const { codeVerifier, codeChallenge } = generatePKCE()
+    
+    console.log('PKCE Generated:')
+    console.log('  - code_verifier length:', codeVerifier.length)
+    console.log('  - code_challenge length:', codeChallenge.length)
 
     // Generate unique state for this OAuth request
     const crypto = require('crypto')
     const state = crypto.randomBytes(32).toString('base64url')
+    
+    console.log('State generated:', state.substring(0, 10) + '...')
 
     // Store code_verifier securely server-side
     const { error: storageError } = await supabase
@@ -49,12 +64,18 @@ export async function POST(request: Request) {
       })
 
     if (storageError) {
-      console.error('Failed to store PKCE code:', storageError)
+      console.error('❌ Failed to store PKCE code:', storageError)
       return NextResponse.json({ error: 'Failed to initiate OAuth' }, { status: 500 })
     }
+    
+    console.log('✅ PKCE code stored successfully')
 
     // Build OAuth URL with PKCE challenge
+    // This will log the full URL with all parameters
     const authUrl = getXOAuthUrl(clientId, redirectUri, state, codeChallenge)
+    
+    console.log('🚀 Returning authUrl to client')
+    console.log('===================================')
 
     return NextResponse.json({ authUrl })
   }
