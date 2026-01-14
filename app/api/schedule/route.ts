@@ -38,6 +38,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from('schedule_config')
+    // @ts-expect-error - Supabase upsert type inference issue
     .upsert({
       user_id: user.id,
       days_of_week,

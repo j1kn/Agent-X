@@ -20,17 +20,27 @@ import { selectNextTopic, extractRecentTopics } from '@/lib/autopilot/topicSelec
 import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
+import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60 // 60 seconds max execution
 
-interface UserProfile {
-  id: string
-  ai_provider: string | null
-  topics: string[] | null
-  tone: string | null
+// Define user profile type for autopilot (subset of user_profiles table)
+type UserProfileForAutopilot = Pick<
+  Database['public']['Tables']['user_profiles']['Row'],
+  'id' | 'ai_provider' | 'topics' | 'tone'
+> & {
   autopilot_enabled: boolean | null
 }
+
+// Define post type for recent posts query (topic field was added recently)
+type RecentPost = {
+  topic: string | null
+  content: string
+}
+
+// Define connected account type
+type ConnectedAccount = Database['public']['Tables']['connected_accounts']['Row']
 
 export async function POST(request: Request) {
   console.log('=== AUTOPILOT RUN STARTED ===')
@@ -40,18 +50,18 @@ export async function POST(request: Request) {
   
   try {
     // Get all users with autopilot enabled
-    const { data, error: usersError } = await supabase
+    const { data: users, error: usersError } = await supabase
       .from('user_profiles')
       .select('id, ai_provider, topics, tone, autopilot_enabled')
       .eq('autopilot_enabled', true)
-    
-    const users = data as UserProfile[] | null
+      .returns<UserProfileForAutopilot[]>()
     
     if (usersError) {
       console.error('Failed to fetch users:', usersError)
       return NextResponse.json({ error: usersError.message }, { status: 500 })
     }
     
+    // Guard against null or empty
     if (!users || users.length === 0) {
       console.log('No users with autopilot enabled')
       return NextResponse.json({ message: 'No users with autopilot enabled' })
@@ -59,9 +69,9 @@ export async function POST(request: Request) {
     
     console.log(`Found ${users.length} user(s) with autopilot enabled`)
     
-    const results = []
+    const results: Array<{ userId: string; status: string; error?: string }> = []
     
-    // Process each user
+    // Process each user (users is now properly typed as UserProfileForAutopilot[])
     for (const user of users) {
       console.log(`\n--- Processing user: ${user.id} ---`)
       
@@ -96,6 +106,7 @@ export async function POST(request: Request) {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(10)
+          .returns<RecentPost[]>()
         
         const recentTopics = extractRecentTopics(recentPosts || [])
         const recentContents = (recentPosts || []).map(p => p.content)
@@ -132,6 +143,7 @@ export async function POST(request: Request) {
           .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
+          .returns<ConnectedAccount[]>()
         
         if (!accounts || accounts.length === 0) {
           await logPipeline(supabase, user.id, 'publishing', 'warning', 'No connected accounts')
@@ -148,7 +160,7 @@ export async function POST(request: Request) {
             if (account.platform === 'x') {
               publishResult = await publishToX(account.access_token, content)
             } else if (account.platform === 'telegram') {
-              publishResult = await publishToTelegram(account.access_token, content)
+              publishResult = await publishToTelegram(account.access_token, account.username, content)
             } else {
               throw new Error(`Unsupported platform: ${account.platform}`)
             }
@@ -160,6 +172,7 @@ export async function POST(request: Request) {
             // Save post record
             const { error: postError } = await supabase
               .from('posts')
+              // @ts-expect-error - Supabase insert type inference issue
               .insert({
                 user_id: user.id,
                 account_id: account.id,
@@ -189,6 +202,7 @@ export async function POST(request: Request) {
             // Save failed post record
             await supabase
               .from('posts')
+              // @ts-expect-error - Supabase insert type inference issue
               .insert({
                 user_id: user.id,
                 account_id: account.id,

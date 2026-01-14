@@ -16,6 +16,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from('user_profiles')
+    // @ts-expect-error - Supabase upsert type inference issue
     .upsert({
       id: user.id,
       autopilot_enabled,
