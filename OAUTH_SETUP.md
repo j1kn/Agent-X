@@ -31,6 +31,25 @@
 - `users.read` - To get user info
 - `offline.access` - For refresh tokens
 
+### PKCE Implementation (RFC 7636)
+Agent X implements **Proof Key for Code Exchange (PKCE)** for maximum security:
+
+**Flow:**
+1. **Connect Request**: Generate random `code_verifier` (32 bytes)
+2. **Code Challenge**: Create SHA-256 hash → `code_challenge`
+3. **Secure Storage**: Store `code_verifier` in database with unique `state`
+4. **OAuth Request**: Send `code_challenge` + `state` to Twitter
+5. **Callback**: Retrieve `code_verifier` using `state` from database
+6. **Token Exchange**: Send `code_verifier` to prove ownership
+7. **Cleanup**: Delete `code_verifier` immediately (one-time use)
+
+**Security Benefits:**
+- Prevents authorization code interception attacks
+- `code_verifier` never exposed in URLs or client-side
+- State is cryptographically random (not predictable)
+- Automatic cleanup of expired PKCE codes (10 min TTL)
+- Industry standard security (RFC 7636)
+
 ---
 
 ## Telegram Bot Setup
