@@ -7,6 +7,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'anthropic'>('gemini')
   const [aiApiKey, setAiApiKey] = useState('')
+  const [defaultModel, setDefaultModel] = useState('')
   const [topics, setTopics] = useState<string[]>([])
   const [newTopic, setNewTopic] = useState('')
   const [tone, setTone] = useState('')
@@ -24,6 +25,7 @@ export default function SettingsPage() {
 
       if (data.profile) {
         setAiProvider(data.profile.ai_provider || 'gemini')
+        setDefaultModel(data.profile.default_model || '')
         setTopics(data.profile.topics || [])
         setTone(data.profile.tone || '')
         setFrequency(data.profile.posting_frequency || 'daily')
@@ -43,6 +45,7 @@ export default function SettingsPage() {
     try {
       const payload: any = {
         ai_provider: aiProvider,
+        default_model: defaultModel,
         topics,
         tone,
         posting_frequency: frequency,
@@ -136,6 +139,42 @@ export default function SettingsPage() {
               />
               <p className="mt-1 text-xs text-gray-500">
                 Your API key is stored securely and never exposed to the client.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Default Model
+              </label>
+              <select
+                value={defaultModel}
+                onChange={(e) => setDefaultModel(e.target.value)}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-gray-900"
+              >
+                <option value="">Auto (provider default)</option>
+                {aiProvider === 'gemini' && (
+                  <>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast)</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (Advanced)</option>
+                  </>
+                )}
+                {aiProvider === 'openai' && (
+                  <>
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  </>
+                )}
+                {aiProvider === 'anthropic' && (
+                  <>
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                  </>
+                )}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Select the AI model for content generation.
               </p>
             </div>
           </div>

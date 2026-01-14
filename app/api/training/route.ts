@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
 
@@ -15,7 +14,7 @@ export async function GET() {
 
   const { data: profile, error } = await supabase
     .from('user_profiles')
-    .select('ai_provider, default_model, topics, tone, posting_frequency')
+    .select('training_instructions')
     .eq('id', user.id)
     .single()
 
@@ -35,22 +34,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { ai_provider, ai_api_key, default_model, topics, tone, posting_frequency } = await request.json()
-
-  const updateData: any = {}
-
-  if (ai_provider) updateData.ai_provider = ai_provider
-  if (ai_api_key) updateData.ai_api_key = ai_api_key
-  if (default_model !== undefined) updateData.default_model = default_model
-  if (topics) updateData.topics = topics
-  if (tone) updateData.tone = tone
-  if (posting_frequency) updateData.posting_frequency = posting_frequency
+  const { training_instructions } = await request.json()
 
   const { error } = await supabase
     .from('user_profiles')
     .upsert({
       id: user.id,
-      ...updateData,
+      training_instructions,
     }, {
       onConflict: 'id'
     })

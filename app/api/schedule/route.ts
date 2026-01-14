@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
 
@@ -13,17 +12,17 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: profile, error } = await supabase
-    .from('user_profiles')
-    .select('ai_provider, default_model, topics, tone, posting_frequency')
-    .eq('id', user.id)
+  const { data: schedule, error } = await supabase
+    .from('schedule_config')
+    .select('*')
+    .eq('user_id', user.id)
     .single()
 
   if (error && error.code !== 'PGRST116') {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ profile })
+  return NextResponse.json({ schedule })
 }
 
 export async function POST(request: Request) {
@@ -35,24 +34,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { ai_provider, ai_api_key, default_model, topics, tone, posting_frequency } = await request.json()
-
-  const updateData: any = {}
-
-  if (ai_provider) updateData.ai_provider = ai_provider
-  if (ai_api_key) updateData.ai_api_key = ai_api_key
-  if (default_model !== undefined) updateData.default_model = default_model
-  if (topics) updateData.topics = topics
-  if (tone) updateData.tone = tone
-  if (posting_frequency) updateData.posting_frequency = posting_frequency
+  const { days_of_week, times, frequency } = await request.json()
 
   const { error } = await supabase
-    .from('user_profiles')
+    .from('schedule_config')
     .upsert({
-      id: user.id,
-      ...updateData,
+      user_id: user.id,
+      days_of_week,
+      times,
+      frequency,
     }, {
-      onConflict: 'id'
+      onConflict: 'user_id'
     })
 
   if (error) {
