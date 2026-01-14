@@ -42,8 +42,8 @@ export async function generateContent(
   try {
     switch (ai_provider) {
       case 'gemini':
-        content = await generateWithGemini(ai_api_key, prompt)
-        model = 'gemini-pro'
+        model = 'gemini-1.5-flash'
+        content = await generateWithGemini(ai_api_key, prompt, model)
         break
       case 'openai':
         content = await generateWithOpenAI(ai_api_key, prompt)
