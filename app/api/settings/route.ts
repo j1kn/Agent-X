@@ -1,8 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
+
+// Define types for query results
+type UserProfile = {
+  ai_provider: string | null
+  ai_api_key: string | null
+  default_model: string | null
+  topics: string[] | null
+  tone: string | null
+  posting_frequency: string | null
+}
 
 export async function GET() {
   const supabase = await createClient()
@@ -13,9 +22,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: profile, error } = await supabase
+  const { data: profileData, error } = await supabase
     .from('user_profiles')
-    .select('ai_provider, default_model, topics, tone, posting_frequency')
+    .select('ai_provider, ai_api_key, default_model, topics, tone, posting_frequency')
     .eq('id', user.id)
     .single()
 
@@ -23,7 +32,21 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ profile })
+  const profile = profileData as UserProfile | null
+
+  // Return connection status (but never expose the actual API key)
+  const isAiConnected = !!(profile?.ai_provider && profile?.ai_api_key)
+
+  return NextResponse.json({ 
+    profile: profile ? {
+      ai_provider: profile.ai_provider,
+      default_model: profile.default_model,
+      topics: profile.topics,
+      tone: profile.tone,
+      posting_frequency: profile.posting_frequency,
+    } : null,
+    isAiConnected
+  })
 }
 
 export async function POST(request: Request) {
@@ -37,7 +60,7 @@ export async function POST(request: Request) {
 
   const { ai_provider, ai_api_key, default_model, topics, tone, posting_frequency } = await request.json()
 
-  const updateData: any = {}
+  const updateData: Record<string, unknown> = {}
 
   if (ai_provider) updateData.ai_provider = ai_provider
   if (ai_api_key) updateData.ai_api_key = ai_api_key
@@ -48,6 +71,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from('user_profiles')
+    // @ts-expect-error - Supabase upsert type inference issue
     .upsert({
       id: user.id,
       ...updateData,
@@ -61,4 +85,3 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
-
