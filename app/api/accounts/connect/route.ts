@@ -34,15 +34,26 @@ export async function POST(request: Request) {
     // Generate PKCE challenge
     const { codeVerifier, codeChallenge } = generatePKCE()
 
-    // Store code verifier in session (you could also use a temp DB table)
-    // For now, we'll pass it in state (not ideal for production, but works for demo)
-    const state = Buffer.from(
-      JSON.stringify({ 
-        userId: user.id, 
-        codeVerifier 
-      })
-    ).toString('base64')
+    // Generate unique state for this OAuth request
+    const crypto = require('crypto')
+    const state = crypto.randomBytes(32).toString('base64url')
 
+    // Store code_verifier securely server-side
+    const { error: storageError } = await supabase
+      .from('oauth_pkce_storage')
+      // @ts-expect-error - Supabase type inference issue
+      .insert({
+        state,
+        code_verifier: codeVerifier,
+        user_id: user.id,
+      })
+
+    if (storageError) {
+      console.error('Failed to store PKCE code:', storageError)
+      return NextResponse.json({ error: 'Failed to initiate OAuth' }, { status: 500 })
+    }
+
+    // Build OAuth URL with PKCE challenge
     const authUrl = getXOAuthUrl(clientId, redirectUri, state, codeChallenge)
 
     return NextResponse.json({ authUrl })

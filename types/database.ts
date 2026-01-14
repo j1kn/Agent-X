@@ -199,6 +199,29 @@ export interface Database {
           created_at?: string
         }
       }
+      oauth_pkce_storage: {
+        Row: {
+          id: string
+          state: string
+          code_verifier: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          state: string
+          code_verifier: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          state?: string
+          code_verifier?: string
+          user_id?: string
+          created_at?: string
+        }
+      }
       learning_data: {
         Row: {
           id: string

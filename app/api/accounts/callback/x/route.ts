@@ -15,13 +15,30 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/accounts?error=missing_params`)
   }
 
-  try {
-    // Decode state to get user ID and code verifier
-    const { userId, codeVerifier } = JSON.parse(Buffer.from(state, 'base64').toString())
+  // Use service client for PKCE lookup (bypasses RLS)
+  const { createServiceClient } = await import('@/lib/supabase/server')
+  const supabase = createServiceClient()
 
-    if (!codeVerifier) {
+  try {
+    // Retrieve code_verifier from secure storage using state
+    const { data: pkceData, error: pkceError } = await supabase
+      .from('oauth_pkce_storage')
+      .select('code_verifier, user_id')
+      .eq('state', state)
+      .single()
+
+    if (pkceError || !pkceData) {
+      console.error('PKCE lookup failed:', pkceError)
       return NextResponse.redirect(`${origin}/accounts?error=invalid_state`)
     }
+
+    const { code_verifier: codeVerifier, user_id: userId } = pkceData
+
+    // Delete the PKCE code immediately after retrieval (one-time use)
+    await supabase
+      .from('oauth_pkce_storage')
+      .delete()
+      .eq('state', state)
 
     // Exchange code for token with PKCE code verifier
     const tokenData = await exchangeXCodeForToken(
@@ -36,8 +53,6 @@ export async function GET(request: Request) {
     const userInfo = await getXUserInfo(tokenData.access_token)
 
     // Save to database
-    const supabase = await createClient()
-
     const expiresAt = new Date()
     expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in)
 
