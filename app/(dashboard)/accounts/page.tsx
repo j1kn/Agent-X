@@ -9,6 +9,8 @@ export default function AccountsPage() {
   const [connecting, setConnecting] = useState(false)
   const [showTelegramModal, setShowTelegramModal] = useState(false)
   const [telegramData, setTelegramData] = useState({ botToken: '', channelUsername: '' })
+  const [showXModal, setShowXModal] = useState(false)
+  const [xData, setXData] = useState({ apiKey: '', apiSecret: '', accessToken: '', accessTokenSecret: '' })
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   
@@ -46,9 +48,45 @@ export default function AccountsPage() {
   }
 
   const handleConnectX = () => {
-    // CRITICAL: Direct browser navigation (not fetch) to trigger OAuth flow
-    // The API will return HTTP 302 redirect to X OAuth consent screen
-    window.location.href = '/api/accounts/connect?platform=x'
+    setShowXModal(true)
+    setError(null)
+  }
+
+  const handleXSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setConnecting(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/accounts/x/manual-connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: xData.apiKey,
+          apiSecret: xData.apiSecret,
+          accessToken: xData.accessToken,
+          accessTokenSecret: xData.accessTokenSecret,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        setError(data.error)
+      } else if (data.success) {
+        setSuccess(`X account @${data.username} connected successfully!`)
+        setShowXModal(false)
+        setXData({ apiKey: '', apiSecret: '', accessToken: '', accessTokenSecret: '' })
+        fetchAccounts()
+      }
+    } catch (error) {
+      console.error('Failed to connect:', error)
+      setError('Failed to connect X account')
+    } finally {
+      setConnecting(false)
+    }
   }
 
   const handleConnectTelegram = () => {
@@ -166,7 +204,7 @@ export default function AccountsPage() {
             disabled={connecting}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50"
           >
-            {connecting ? 'Connecting...' : 'Connect X (Twitter)'}
+            {connecting ? 'Connecting...' : 'Connect X (Manual)'}
           </button>
         </div>
       </div>
@@ -268,6 +306,99 @@ export default function AccountsPage() {
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
                   {connecting ? 'Connecting...' : 'Connect'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* X Manual Connect Modal */}
+      {showXModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Connect X Account (Manual)
+            </h3>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Enter your X API credentials. Get these from your X Developer Portal.
+            </p>
+            
+            <form onSubmit={handleXSubmit}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  API Key
+                </label>
+                <input
+                  type="text"
+                  value={xData.apiKey}
+                  onChange={(e) => setXData({ ...xData, apiKey: e.target.value })}
+                  placeholder="Enter your X API Key"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  API Secret
+                </label>
+                <input
+                  type="password"
+                  value={xData.apiSecret}
+                  onChange={(e) => setXData({ ...xData, apiSecret: e.target.value })}
+                  placeholder="Enter your X API Secret"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Access Token
+                </label>
+                <input
+                  type="text"
+                  value={xData.accessToken}
+                  onChange={(e) => setXData({ ...xData, accessToken: e.target.value })}
+                  placeholder="Enter your X Access Token"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Access Token Secret
+                </label>
+                <input
+                  type="password"
+                  value={xData.accessTokenSecret}
+                  onChange={(e) => setXData({ ...xData, accessTokenSecret: e.target.value })}
+                  placeholder="Enter your X Access Token Secret"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowXModal(false)
+                    setXData({ apiKey: '', apiSecret: '', accessToken: '', accessTokenSecret: '' })
+                  }}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={connecting}
+                  className="px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {connecting ? 'Validating...' : 'Connect'}
                 </button>
               </div>
             </form>

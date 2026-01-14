@@ -1,36 +1,35 @@
 import type { PublishResult, EngagementMetrics } from './types'
+import { decrypt } from '@/lib/crypto/encryption'
+import { postTweetOAuth1, type XOAuth1Credentials } from '@/lib/oauth/x-oauth1'
+
+/**
+ * Parse and decrypt X OAuth 1.0a credentials from stored JSON
+ */
+function decryptXCredentials(encryptedJson: string): XOAuth1Credentials {
+  const parsed = JSON.parse(encryptedJson)
+  
+  return {
+    apiKey: decrypt(parsed.apiKey),
+    apiSecret: decrypt(parsed.apiSecret),
+    accessToken: decrypt(parsed.accessToken),
+    accessTokenSecret: decrypt(parsed.accessTokenSecret),
+  }
+}
 
 export async function publishToX(
-  accessToken: string,
+  encryptedCredentials: string,
   content: string
 ): Promise<PublishResult> {
   try {
-    // X (Twitter) API v2 - Create tweet
-    const url = 'https://api.twitter.com/2/tweets'
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: content,
-      }),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.detail || data.title || 'Failed to publish to X',
-      }
-    }
+    // Decrypt OAuth 1.0a credentials at runtime
+    const credentials = decryptXCredentials(encryptedCredentials)
+    
+    // Post tweet using OAuth 1.0a signing
+    const result = await postTweetOAuth1(credentials, content)
 
     return {
       success: true,
-      platformPostId: data.data.id,
+      platformPostId: result.id,
     }
   } catch (error) {
     return {
@@ -41,16 +40,44 @@ export async function publishToX(
 }
 
 export async function getXMetrics(
-  accessToken: string,
+  encryptedCredentials: string,
   tweetId: string
 ): Promise<EngagementMetrics> {
   try {
-    // X API v2 - Get tweet metrics
-    const url = `https://api.twitter.com/2/tweets/${tweetId}?tweet.fields=public_metrics`
+    // Decrypt OAuth 1.0a credentials at runtime
+    const credentials = decryptXCredentials(encryptedCredentials)
+    
+    // Create OAuth client for request signing
+    const OAuth = require('oauth-1.0a')
+    const crypto = require('crypto')
+    
+    const oauth = new OAuth({
+      consumer: {
+        key: credentials.apiKey,
+        secret: credentials.apiSecret,
+      },
+      signature_method: 'HMAC-SHA1',
+      hash_function(baseString: string, key: string) {
+        return crypto.createHmac('sha1', key).update(baseString).digest('base64')
+      },
+    })
+    
+    const requestData = {
+      url: `https://api.twitter.com/2/tweets/${tweetId}?tweet.fields=public_metrics`,
+      method: 'GET',
+    }
+    
+    const token = {
+      key: credentials.accessToken,
+      secret: credentials.accessTokenSecret,
+    }
+    
+    const authHeader = oauth.toHeader(oauth.authorize(requestData, token))
 
-    const response = await fetch(url, {
+    const response = await fetch(requestData.url, {
+      method: requestData.method,
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        ...authHeader,
       },
     })
 
