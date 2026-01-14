@@ -1,0 +1,28 @@
+# Agent X Project Rules
+
+## Architecture
+- Single-user internal automation tool
+- All API routes use Node.js runtime (no Edge)
+- Server-only access to AI API keys
+- Supabase for auth, database, and cron
+- Vercel for hosting
+
+## Database
+- ALL schema changes via Supabase MCP only
+- Use RLS policies for data security
+- Posts table handles scheduling (no separate jobs table)
+
+## Pipeline
+- Deterministic flow: plan → generate → schedule → publish → collect → learn
+- Learning restricted to timing and format only (no content/topic learning)
+
+## Security
+- AI API keys stored encrypted, never exposed to client
+- Service role key only in server-side code
+- OAuth flows for platform connections
+
+## Deployment
+- Vercel-safe: no filesystem writes, no background workers
+- Supabase cron triggers API routes via webhooks
+- All env vars must be declared
+
