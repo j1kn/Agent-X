@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     switch (provider) {
       case 'gemini': {
         // Test Gemini API with a simple request
-        const url = `${GEMINI_BASE_URL}/models/gemini-1.5-flash-latest:generateContent?key=${api_key}`
+        const url = `${GEMINI_BASE_URL}/models/gemini-1.5-flash:generateContent?key=${api_key}`
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

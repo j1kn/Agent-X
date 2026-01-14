@@ -12,21 +12,24 @@ export async function generateWithGemini(
     throw new Error('Gemini API key is required')
   }
 
-  // Safeguard: Use gemini-1.5-flash-latest if model name is missing or invalid
+  // Safeguard: Use gemini-1.5-flash if model name is missing or invalid
   let validModelName = modelName && modelName.trim() !== '' 
     ? modelName 
-    : 'gemini-1.5-flash-latest'
+    : 'gemini-1.5-flash'
   
   // Remove "models/" prefix if present
   validModelName = validModelName.replace(/^models\//, '')
   
-  // Map common model names to REST API identifiers (requires -latest suffix)
+  // Remove -latest suffix if present (v1 API doesn't use it)
+  validModelName = validModelName.replace(/-latest$/, '')
+  
+  // Map common model names to v1 API identifiers
   const modelMap: Record<string, string> = {
-    'gemini-1.5-flash': 'gemini-1.5-flash-latest',
-    'gemini-1.5-flash-latest': 'gemini-1.5-flash-latest',
-    'gemini-1.5-pro': 'gemini-1.5-pro-latest',
-    'gemini-1.5-pro-latest': 'gemini-1.5-pro-latest',
-    'gemini-pro': 'gemini-1.5-flash-latest', // Fallback old name to new model
+    'gemini-1.5-flash': 'gemini-1.5-flash',
+    'gemini-1.5-flash-latest': 'gemini-1.5-flash',
+    'gemini-1.5-pro': 'gemini-1.5-pro',
+    'gemini-1.5-pro-latest': 'gemini-1.5-pro',
+    'gemini-pro': 'gemini-1.5-flash', // Fallback old name to new model
   }
   
   const finalModelName = modelMap[validModelName] || validModelName

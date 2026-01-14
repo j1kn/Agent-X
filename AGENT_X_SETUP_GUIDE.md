@@ -154,7 +154,7 @@ Go to **Settings**:
 
 1. Select AI Provider (Gemini, OpenAI, or Anthropic)
 2. Paste your API key (from Google AI Studio, OpenAI, or Anthropic)
-3. Select default model (e.g., `gemini-1.5-flash-latest`)
+3. Select default model (e.g., `gemini-1.5-flash`)
 4. Add topics (e.g., "AI automation", "developer tools")
 5. Set tone (e.g., "professional")
 6. Save
