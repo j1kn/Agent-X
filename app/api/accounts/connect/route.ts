@@ -6,6 +6,81 @@ import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
 
+// GET handler for X OAuth (direct browser navigation with HTTP 302 redirect)
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url)
+  const platform = requestUrl.searchParams.get('platform')
+
+  // Only handle X OAuth via GET (direct navigation)
+  if (platform !== 'x') {
+    return NextResponse.json({ error: 'Use POST for other platforms' }, { status: 400 })
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.redirect(`${requestUrl.origin}/login?error=unauthorized`)
+  }
+
+  console.log('=== Initiating X OAuth 2.0 Flow (GET) ===')
+  
+  const clientId = process.env.X_CLIENT_ID!
+  const clientSecret = process.env.X_CLIENT_SECRET!
+  
+  if (!clientId || !clientSecret) {
+    console.error('X OAuth credentials missing!')
+    return NextResponse.redirect(`${requestUrl.origin}/accounts?error=oauth_not_configured`)
+  }
+
+  // Build redirect URI - MUST match exactly what's in X Developer Portal
+  const origin = requestUrl.origin
+  const redirectUri = `${origin}/api/accounts/callback/x`
+  
+  console.log('Redirect URI:', redirectUri)
+  console.log('⚠️  VERIFY: This MUST match exactly in X Developer Portal → App Settings → Callback URLs')
+
+  // Generate PKCE challenge
+  const { codeVerifier, codeChallenge } = generatePKCE()
+  
+  console.log('PKCE Generated:')
+  console.log('  - code_verifier length:', codeVerifier.length)
+  console.log('  - code_challenge length:', codeChallenge.length)
+
+  // Generate unique state for this OAuth request
+  const crypto = require('crypto')
+  const state = crypto.randomBytes(32).toString('base64url')
+  
+  console.log('State generated:', state.substring(0, 10) + '...')
+
+  // Store code_verifier securely server-side
+  const { error: storageError } = await supabase
+    .from('oauth_pkce_storage')
+    // @ts-expect-error - Supabase type inference issue
+    .insert({
+      state,
+      code_verifier: codeVerifier,
+      user_id: user.id,
+    })
+
+  if (storageError) {
+    console.error('❌ Failed to store PKCE code:', storageError)
+    return NextResponse.redirect(`${origin}/accounts?error=oauth_init_failed`)
+  }
+  
+  console.log('✅ PKCE code stored successfully')
+
+  // Build OAuth URL with PKCE challenge
+  const authUrl = getXOAuthUrl(clientId, redirectUri, state, codeChallenge)
+  
+  console.log('🚀 Returning HTTP 302 redirect to X OAuth')
+  console.log('===================================')
+
+  // CRITICAL: Return HTTP 302 redirect (not JSON)
+  return NextResponse.redirect(authUrl)
+}
+
+// POST handler for Telegram (requires bot token in body)
 export async function POST(request: Request) {
   const supabase = await createClient()
 
@@ -17,67 +92,8 @@ export async function POST(request: Request) {
 
   const { platform, botToken, channelUsername } = await request.json()
 
-  if (!platform || !['telegram', 'x'].includes(platform)) {
-    return NextResponse.json({ error: 'Invalid platform' }, { status: 400 })
-  }
-
-  // X OAuth Flow
-  if (platform === 'x') {
-    console.log('=== Initiating X OAuth 2.0 Flow ===')
-    
-    const clientId = process.env.X_CLIENT_ID!
-    const clientSecret = process.env.X_CLIENT_SECRET!
-    
-    if (!clientId || !clientSecret) {
-      console.error('X OAuth credentials missing!')
-      return NextResponse.json({ error: 'X OAuth not configured' }, { status: 500 })
-    }
-
-    // Build redirect URI - MUST match exactly what's in X Developer Portal
-    const origin = new URL(request.url).origin
-    const redirectUri = `${origin}/api/accounts/callback/x`
-    
-    console.log('Redirect URI:', redirectUri)
-    console.log('⚠️  VERIFY: This MUST match exactly in X Developer Portal → App Settings → Callback URLs')
-
-    // Generate PKCE challenge
-    const { codeVerifier, codeChallenge } = generatePKCE()
-    
-    console.log('PKCE Generated:')
-    console.log('  - code_verifier length:', codeVerifier.length)
-    console.log('  - code_challenge length:', codeChallenge.length)
-
-    // Generate unique state for this OAuth request
-    const crypto = require('crypto')
-    const state = crypto.randomBytes(32).toString('base64url')
-    
-    console.log('State generated:', state.substring(0, 10) + '...')
-
-    // Store code_verifier securely server-side
-    const { error: storageError } = await supabase
-      .from('oauth_pkce_storage')
-      // @ts-expect-error - Supabase type inference issue
-      .insert({
-        state,
-        code_verifier: codeVerifier,
-        user_id: user.id,
-      })
-
-    if (storageError) {
-      console.error('❌ Failed to store PKCE code:', storageError)
-      return NextResponse.json({ error: 'Failed to initiate OAuth' }, { status: 500 })
-    }
-    
-    console.log('✅ PKCE code stored successfully')
-
-    // Build OAuth URL with PKCE challenge
-    // This will log the full URL with all parameters
-    const authUrl = getXOAuthUrl(clientId, redirectUri, state, codeChallenge)
-    
-    console.log('🚀 Returning authUrl to client')
-    console.log('===================================')
-
-    return NextResponse.json({ authUrl })
+  if (!platform || !['telegram'].includes(platform)) {
+    return NextResponse.json({ error: 'Invalid platform or use GET for X' }, { status: 400 })
   }
 
   // Telegram Bot Token Flow

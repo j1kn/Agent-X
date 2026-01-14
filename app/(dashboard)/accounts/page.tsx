@@ -45,33 +45,10 @@ export default function AccountsPage() {
     }
   }
 
-  const handleConnectX = async () => {
-    setConnecting(true)
-    setError(null)
-    
-    try {
-      const response = await fetch('/api/accounts/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ platform: 'x' }),
-      })
-
-      const data = await response.json()
-
-      if (data.error) {
-        setError(data.error)
-        setConnecting(false)
-      } else if (data.authUrl) {
-        // Redirect to X OAuth
-        window.location.href = data.authUrl
-      }
-    } catch (error) {
-      console.error('Failed to connect:', error)
-      setError('Failed to initiate connection')
-      setConnecting(false)
-    }
+  const handleConnectX = () => {
+    // CRITICAL: Direct browser navigation (not fetch) to trigger OAuth flow
+    // The API will return HTTP 302 redirect to X OAuth consent screen
+    window.location.href = '/api/accounts/connect?platform=x'
   }
 
   const handleConnectTelegram = () => {
