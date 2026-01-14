@@ -24,6 +24,14 @@ import { publishToTelegram } from '@/lib/platforms/telegram'
 export const runtime = 'nodejs'
 export const maxDuration = 60 // 60 seconds max execution
 
+interface UserProfile {
+  id: string
+  ai_provider: string | null
+  topics: string[] | null
+  tone: string | null
+  autopilot_enabled: boolean | null
+}
+
 export async function POST(request: Request) {
   console.log('=== AUTOPILOT RUN STARTED ===')
   console.log('Timestamp:', new Date().toISOString())
@@ -32,10 +40,12 @@ export async function POST(request: Request) {
   
   try {
     // Get all users with autopilot enabled
-    const { data: users, error: usersError } = await supabase
+    const { data, error: usersError } = await supabase
       .from('user_profiles')
       .select('id, ai_provider, topics, tone, autopilot_enabled')
       .eq('autopilot_enabled', true)
+    
+    const users = data as UserProfile[] | null
     
     if (usersError) {
       console.error('Failed to fetch users:', usersError)
