@@ -154,8 +154,8 @@ export default function SettingsPage() {
                 <option value="">Auto (provider default)</option>
                 {aiProvider === 'gemini' && (
                   <>
-                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast)</option>
-                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (Advanced)</option>
+                    <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Fast)</option>
+                    <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Advanced)</option>
                   </>
                 )}
                 {aiProvider === 'openai' && (
