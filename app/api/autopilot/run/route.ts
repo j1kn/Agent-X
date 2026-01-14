@@ -42,19 +42,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: usersError.message }, { status: 500 })
     }
     
-    // @ts-expect-error - Supabase type inference issue with select
     if (!users || users.length === 0) {
       console.log('No users with autopilot enabled')
       return NextResponse.json({ message: 'No users with autopilot enabled' })
     }
     
-    // @ts-expect-error - Supabase type inference issue with select
     console.log(`Found ${users.length} user(s) with autopilot enabled`)
     
     const results = []
     
     // Process each user
-    // @ts-expect-error - Supabase type inference issue with select
     for (const user of users) {
       console.log(`\n--- Processing user: ${user.id} ---`)
       
