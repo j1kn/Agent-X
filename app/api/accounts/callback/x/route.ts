@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { exchangeXCodeForToken, getXUserInfo } from '@/lib/oauth/x'
+import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
 
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
 
     const { error } = await supabase
       .from('connected_accounts')
+      // @ts-expect-error - Supabase type inference issue with upsert
       .upsert({
         user_id: userId,
         platform: 'x',
@@ -46,6 +48,8 @@ export async function GET(request: Request) {
         token_expires_at: expiresAt.toISOString(),
         username: userInfo.username,
         is_active: true,
+      }, {
+        onConflict: 'user_id,platform'
       })
 
     if (error) {

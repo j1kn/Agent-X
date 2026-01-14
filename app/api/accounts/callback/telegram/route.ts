@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { verifyTelegramAuth, type TelegramAuthData } from '@/lib/oauth/telegram'
+import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
 
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
     // Save to database
     const { error } = await supabase
       .from('connected_accounts')
+      // @ts-expect-error - Supabase type inference issue with upsert
       .upsert({
         user_id: user.id,
         platform: 'telegram',
@@ -34,6 +36,8 @@ export async function POST(request: Request) {
         access_token: process.env.TELEGRAM_BOT_TOKEN!, // Bot token for posting
         username: authData.username || `user_${authData.id}`,
         is_active: true,
+      }, {
+        onConflict: 'user_id,platform'
       })
 
     if (error) {

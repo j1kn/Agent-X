@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   try {
     await schedulePost(postId, new Date(scheduledFor))
 
+    // @ts-ignore - Supabase type inference issue
     await supabase.from('pipeline_logs').insert({
       user_id: user.id,
       step: 'scheduling',

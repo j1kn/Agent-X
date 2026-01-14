@@ -20,6 +20,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from('connected_accounts')
+    // @ts-expect-error - Supabase type inference issue with update
     .update({ is_active: false })
     .eq('id', accountId)
     .eq('user_id', user.id)

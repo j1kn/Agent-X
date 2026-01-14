@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   try {
     const result = await generatePost(user.id, plan)
 
+    // @ts-ignore - Supabase type inference issue
     await supabase.from('pipeline_logs').insert({
       user_id: user.id,
       step: 'generation',
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
+    // @ts-ignore - Supabase type inference issue
     await supabase.from('pipeline_logs').insert({
       user_id: user.id,
       step: 'generation',

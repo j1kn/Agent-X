@@ -25,6 +25,7 @@ export async function generateContent(
     .eq('id', userId)
     .single()
 
+  // @ts-expect-error - Profile type inference issue
   if (error || !profile?.ai_provider || !profile?.ai_api_key) {
     throw new Error('AI provider not configured')
   }

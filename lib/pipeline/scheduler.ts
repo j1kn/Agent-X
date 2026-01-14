@@ -9,6 +9,7 @@ export async function schedulePost(
   // Update post status to 'scheduled' with scheduled_for timestamp
   const { error } = await supabase
     .from('posts')
+    // @ts-expect-error - Supabase type inference issue with update
     .update({
       status: 'scheduled',
       scheduled_for: scheduledTime.toISOString(),

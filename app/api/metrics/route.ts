@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: postsError.message }, { status: 500 })
     }
 
-    const postIds = posts?.map(p => p.id) || []
+    const postIds = posts?.map((p: { id: string }) => p.id) || []
 
     if (postIds.length === 0) {
       return NextResponse.json({ metrics: [] })

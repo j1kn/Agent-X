@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
 
@@ -49,6 +50,8 @@ export async function POST(request: Request) {
     .upsert({
       id: user.id,
       ...updateData,
+    }, {
+      onConflict: 'id'
     })
 
   if (error) {
