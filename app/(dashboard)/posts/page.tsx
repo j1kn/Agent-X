@@ -89,6 +89,11 @@ export default function PostsPage() {
                         {post.connected_accounts?.platform}
                       </span>
                     </div>
+                    {post.topic && (
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mb-1">
+                        Topic: {post.topic}
+                      </p>
+                    )}
                     <p className="text-sm text-gray-900 dark:text-white mb-2">
                       {post.content}
                     </p>

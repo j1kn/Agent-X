@@ -18,10 +18,10 @@ export async function generateContent(
 ): Promise<{ content: string; prompt: string; model: string }> {
   const supabase = await createClient()
 
-  // Fetch user's AI provider and API key (server-only)
+  // Fetch user's AI provider, API key, default model, and training instructions (server-only)
   const { data: profile, error } = await supabase
     .from('user_profiles')
-    .select('ai_provider, ai_api_key')
+    .select('ai_provider, ai_api_key, default_model, training_instructions')
     .eq('id', userId)
     .single()
 
@@ -30,10 +30,10 @@ export async function generateContent(
     throw new Error('AI provider not configured')
   }
 
-  const { ai_provider, ai_api_key } = profile
+  const { ai_provider, ai_api_key, default_model, training_instructions } = profile
 
-  // Build prompt
-  const prompt = buildPrompt(options)
+  // Build prompt with training instructions
+  const prompt = buildPrompt(options, training_instructions)
 
   // Generate content based on provider
   let content: string
@@ -42,16 +42,16 @@ export async function generateContent(
   try {
     switch (ai_provider) {
       case 'gemini':
-        model = 'gemini-1.5-flash'
+        model = default_model || 'gemini-1.5-flash'
         content = await generateWithGemini(ai_api_key, prompt, model)
         break
       case 'openai':
+        model = default_model || 'gpt-4'
         content = await generateWithOpenAI(ai_api_key, prompt)
-        model = 'gpt-4'
         break
       case 'anthropic':
+        model = default_model || 'claude-3-5-sonnet-20241022'
         content = await generateWithAnthropic(ai_api_key, prompt)
-        model = 'claude-3-5-sonnet'
         break
       default:
         throw new Error(`Unsupported AI provider: ${ai_provider}`)
@@ -72,10 +72,18 @@ export async function generateContent(
   }
 }
 
-function buildPrompt(options: GenerateOptions): string {
+function buildPrompt(options: GenerateOptions, trainingInstructions?: string): string {
   const { topic, tone, recentPosts, format } = options
 
-  let prompt = `Generate a social media post about "${topic}" with a ${tone} tone.`
+  let prompt = ''
+
+  // Inject training instructions at the top if available (Agent X constitution)
+  if (trainingInstructions && trainingInstructions.trim()) {
+    prompt += `AGENT X CONSTITUTION (follow these guidelines):\n${trainingInstructions}\n\n`
+    prompt += '---\n\n'
+  }
+
+  prompt += `Generate a social media post about "${topic}" with a ${tone} tone.`
 
   if (format) {
     prompt += ` Use a ${format} format.`
