@@ -31,7 +31,7 @@ interface LinkedInUGCPost {
 /**
  * Check if LinkedIn token has expired
  */
-function isTokenExpired(expiresAt: string | null): boolean {
+function isTokenExpired(expiresAt: string | null | undefined): boolean {
   if (!expiresAt) return false
   return new Date(expiresAt) <= new Date()
 }
