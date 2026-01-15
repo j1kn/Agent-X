@@ -4,6 +4,12 @@ import { validatePostContent } from '@/lib/utils/validation'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
 import { getNextScheduledAt, type ScheduleConfig } from '@/lib/scheduling/smart-scheduler'
 
+// Strict type for connected account from DB
+type ConnectedAccount = {
+  id: string
+  platform: 'x' | 'telegram' | 'linkedin'
+}
+
 export interface MultiPlatformPost {
   postId: string
   platform: 'x' | 'telegram' | 'linkedin'
@@ -69,14 +75,21 @@ export async function generatePost(
   const scheduledTime = getNextScheduledAt(scheduleConfig)
 
   // 7. Get connected accounts for X and Telegram
-  const { data: accounts } = await supabase
+  const { data: accountsData, error: accountsError } = await supabase
     .from('connected_accounts')
     .select('id, platform')
     .eq('user_id', userId)
     .eq('is_active', true)
     .in('platform', ['x', 'telegram'])
 
-  if (!accounts || accounts.length === 0) {
+  if (accountsError) {
+    throw new Error(`Failed to fetch accounts: ${accountsError.message}`)
+  }
+
+  // Type assertion after validation
+  const accounts = (accountsData || []) as ConnectedAccount[]
+
+  if (accounts.length === 0) {
     throw new Error('No active X or Telegram accounts connected')
   }
 
@@ -84,7 +97,7 @@ export async function generatePost(
   const posts: MultiPlatformPost[] = []
   
   for (const account of accounts) {
-    const platform = account.platform as 'x' | 'telegram'
+    const platform = account.platform
     const content = platform === 'x' ? variants.x : variants.telegram
 
     // Validate content for platform
