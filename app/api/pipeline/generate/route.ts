@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generatePost } from '@/lib/pipeline/generator'
-import type { PlanningResult } from '@/lib/pipeline/planner'
 
 export const runtime = 'nodejs'
 
@@ -14,22 +13,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const plan: PlanningResult = await request.json()
+  const { topic } = await request.json()
 
-  if (!plan || !plan.topic || !plan.accountId) {
-    return NextResponse.json({ error: 'Invalid plan data' }, { status: 400 })
+  if (!topic) {
+    return NextResponse.json({ error: 'Topic is required' }, { status: 400 })
   }
 
   try {
-    const result = await generatePost(user.id, plan)
+    // Generate master post + platform variants + schedule all
+    const result = await generatePost(user.id, topic)
 
     // @ts-ignore - Supabase type inference issue
     await supabase.from('pipeline_logs').insert({
       user_id: user.id,
       step: 'generation',
       status: 'success',
-      message: 'Post generated successfully',
-      metadata: { post_id: result.postId },
+      message: `Generated ${result.posts.length} posts for ${result.posts.map(p => p.platform).join(', ')}`,
+      metadata: {
+        master_content: result.masterContent,
+        posts: result.posts.map(p => ({ platform: p.platform, post_id: p.postId })),
+      },
     })
 
     return NextResponse.json(result)
