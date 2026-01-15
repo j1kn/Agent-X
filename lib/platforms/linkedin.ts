@@ -38,18 +38,20 @@ function isTokenExpired(expiresAt: string | null): boolean {
 /**
  * Publish a text post to LinkedIn Company Page
  * 
- * @param encryptedToken - Encrypted OAuth 2.0 access token
- * @param organizationId - LinkedIn organization ID (numeric)
- * @param content - Post content (max 3000 chars)
- * @param tokenExpiresAt - Token expiration timestamp
+ * @param args - PublishArgs object with accessToken, platformUserId, content, tokenExpiresAt
  * @returns PublishResult with success status and post ID
  */
 export async function publishToLinkedIn(
-  encryptedToken: string,
-  organizationId: string,
-  content: string,
-  tokenExpiresAt: string | null
+  args: PublishArgs
 ): Promise<PublishResult> {
+  const { accessToken: encryptedToken, platformUserId: organizationId, content, tokenExpiresAt } = args
+  
+  if (!organizationId) {
+    return {
+      success: false,
+      error: 'LinkedIn organization ID (platformUserId) is required',
+    }
+  }
   try {
     // Check token expiration before attempting to post
     if (isTokenExpired(tokenExpiresAt)) {

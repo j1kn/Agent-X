@@ -1,4 +1,4 @@
-import type { PublishResult, EngagementMetrics } from './types'
+import type { PublishResult, EngagementMetrics, PublishArgs } from './types'
 import { decrypt } from '@/lib/crypto/encryption'
 import { postTweetOAuth1, type XOAuth1Credentials } from '@/lib/oauth/x-oauth1'
 
@@ -17,12 +17,14 @@ function decryptXCredentials(encryptedJson: string): XOAuth1Credentials {
 }
 
 export async function publishToX(
-  encryptedCredentials: string,
-  content: string
+  args: PublishArgs
 ): Promise<PublishResult> {
+  const { accessToken, content } = args
+  
   try {
     // Decrypt OAuth 1.0a credentials at runtime
-    const credentials = decryptXCredentials(encryptedCredentials)
+    // accessToken contains the encrypted JSON credentials for X
+    const credentials = decryptXCredentials(accessToken)
     
     // Post tweet using OAuth 1.0a signing
     const result = await postTweetOAuth1(credentials, content)

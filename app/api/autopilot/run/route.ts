@@ -21,6 +21,7 @@ import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { publishToLinkedIn } from '@/lib/platforms/linkedin'
+import type { PublishArgs } from '@/lib/platforms/types'
 import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
@@ -156,20 +157,30 @@ export async function POST(request: Request) {
           console.log(`Publishing to ${account.platform} (${account.username})...`)
           
           try {
+            // Build standardized PublishArgs object
+            const publishArgs: PublishArgs = {
+              accessToken: account.access_token,
+              platformUserId: account.platform_user_id || account.username,
+              content,
+              tokenExpiresAt: account.token_expires_at || null,
+            }
+            
             let publishResult
             
             if (account.platform === 'x') {
-              publishResult = await publishToX(account.access_token, content)
+              publishResult = await publishToX(publishArgs)
             } else if (account.platform === 'telegram') {
-              publishResult = await publishToTelegram(account.access_token, account.username, content)
+              publishResult = await publishToTelegram({
+                ...publishArgs,
+                platformUserId: account.username, // Telegram uses username
+              })
             } else if (account.platform === 'linkedin') {
               // LinkedIn requires organization ID and checks token expiration
-              publishResult = await publishToLinkedIn(
-                account.access_token,
-                account.platform_user_id,
-                content,
-                account.token_expires_at
-              )
+              publishResult = await publishToLinkedIn({
+                ...publishArgs,
+                platformUserId: account.platform_user_id, // LinkedIn uses platform_user_id
+                tokenExpiresAt: account.token_expires_at || null,
+              })
               
               // If token expired, mark account as inactive
               if (!publishResult.success && publishResult.error?.includes('expired')) {

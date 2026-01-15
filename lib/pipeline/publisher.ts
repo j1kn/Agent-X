@@ -3,6 +3,11 @@ import { publishToTelegram } from '@/lib/platforms/telegram'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToLinkedIn } from '@/lib/platforms/linkedin'
 import { Platform } from '@/lib/types/platform'
+import type { PublishArgs } from '@/lib/platforms/types'
+
+// 🚨 RULE: All platform publishers MUST use PublishArgs object signature.
+// Positional arguments are forbidden to prevent type drift.
+// This ensures compile-time type safety and consistent interfaces across all platforms.
 
 export async function publishScheduledPosts(): Promise<{
   published: number
@@ -74,28 +79,38 @@ export async function publishScheduledPosts(): Promise<{
 
       console.log(`[Publisher] Publishing post ${postId} to ${platform}`)
 
-      // STEP 2.2: Route to platform-specific publisher
+      // STEP 2.2: Route to platform-specific publisher using standardized PublishArgs
       let result
+
+      // Build standardized arguments object
+      const publishArgs: PublishArgs = {
+        accessToken: account.access_token,
+        platformUserId: account.platform_user_id || account.username, // Use org ID for LinkedIn, username for Telegram
+        content,
+        tokenExpiresAt: account.token_expires_at || null,
+      }
 
       switch (platform) {
         case 'telegram':
-          result = await publishToTelegram(
-            account.access_token,
-            account.username,
-            content
-          )
+          // For Telegram: platformUserId is the channel username
+          result = await publishToTelegram({
+            ...publishArgs,
+            platformUserId: account.username, // Telegram uses username field
+          })
           break
 
         case 'x':
-          result = await publishToX(account.access_token, content)
+          // For X: accessToken contains encrypted OAuth 1.0a credentials JSON
+          result = await publishToX(publishArgs)
           break
 
         case 'linkedin':
-          result = await publishToLinkedIn(
-            account.access_token,
-            account.platform_user_id, // LinkedIn organization ID
-            content
-          )
+          // For LinkedIn: platformUserId is the organization ID
+          result = await publishToLinkedIn({
+            ...publishArgs,
+            platformUserId: account.platform_user_id, // LinkedIn uses platform_user_id
+            tokenExpiresAt: account.token_expires_at || null,
+          })
           break
 
         default:

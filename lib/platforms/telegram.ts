@@ -1,10 +1,19 @@
-import type { PublishResult, EngagementMetrics } from './types'
+import type { PublishResult, EngagementMetrics, PublishArgs } from './types'
 
 export async function publishToTelegram(
-  accessToken: string,
-  username: string,
-  content: string
+  args: PublishArgs
 ): Promise<PublishResult> {
+  const { accessToken, platformUserId, content } = args
+  
+  // platformUserId is the Telegram channel username (e.g., @mychannel)
+  const username = platformUserId || ''
+  if (!username) {
+    return {
+      success: false,
+      error: 'Telegram channel username (platformUserId) is required',
+    }
+  }
+
   try {
     // Telegram Bot API - send message to channel
     // The accessToken here is the bot token
