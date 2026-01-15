@@ -3,16 +3,17 @@ import { createClient } from '@/lib/supabase/server'
 import { validatePostContent } from '@/lib/utils/validation'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
 import { getNextScheduledAt, type ScheduleConfig } from '@/lib/scheduling/smart-scheduler'
+import { Platform } from '@/lib/types/platform'
 
 // Strict type for connected account from DB
 type ConnectedAccount = {
   id: string
-  platform: 'x' | 'telegram' | 'linkedin'
+  platform: Platform
 }
 
 export interface MultiPlatformPost {
   postId: string
-  platform: 'x' | 'telegram' | 'linkedin'
+  platform: Platform
   content: string
   scheduledFor: Date
 }
