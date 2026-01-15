@@ -1,5 +1,6 @@
 import { decrypt } from '@/lib/crypto/encryption'
-import type { PublishResult, EngagementMetrics } from './types'
+import type { PublishArgs, PublishResult } from '@/lib/pipeline/types'
+import type { EngagementMetrics } from './types'
 
 /**
  * LinkedIn Company Page Posting
@@ -132,7 +133,7 @@ export async function publishToLinkedIn(
     
     return {
       success: true,
-      platformPostId: postId,
+      postId: postId,
     }
   } catch (error) {
     console.error('[LinkedIn] Publishing error:', error)

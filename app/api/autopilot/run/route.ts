@@ -21,7 +21,7 @@ import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { publishToLinkedIn } from '@/lib/platforms/linkedin'
-import type { PublishArgs } from '@/lib/platforms/types'
+import type { PublishArgs } from '@/lib/pipeline/types'
 import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
                 content,
                 platform: account.platform,
                 published_at: new Date().toISOString(),
-                platform_post_id: publishResult.platformPostId,
+                platform_post_id: publishResult.postId,
                 generation_prompt: prompt,
                 generation_model: model,
                 topic,
@@ -219,10 +219,10 @@ export async function POST(request: Request) {
             if (postError) {
               console.error('Failed to save post record:', postError)
             } else {
-              console.log(`✓ Published successfully (ID: ${publishResult.platformPostId})`)
+              console.log(`✓ Published successfully (ID: ${publishResult.postId})`)
               await logPipeline(supabase, user.id, 'publishing', 'success', `Published to ${account.platform}`, { 
                 platform: account.platform,
-                postId: publishResult.platformPostId
+                postId: publishResult.postId
               })
             }
           } catch (publishError) {

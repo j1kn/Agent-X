@@ -3,11 +3,12 @@ import { publishToTelegram } from '@/lib/platforms/telegram'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToLinkedIn } from '@/lib/platforms/linkedin'
 import { Platform } from '@/lib/types/platform'
-import type { PublishArgs } from '@/lib/platforms/types'
+import type { PublishArgs } from '@/lib/pipeline/types'
 
 // 🚨 RULE: All platform publishers MUST use PublishArgs object signature.
 // Positional arguments are forbidden to prevent type drift.
 // This ensures compile-time type safety and consistent interfaces across all platforms.
+// Types MUST be imported from @/lib/pipeline/types (single source of truth).
 
 export async function publishScheduledPosts(): Promise<{
   published: number
@@ -118,7 +119,7 @@ export async function publishScheduledPosts(): Promise<{
       }
 
       // STEP 2.3: Handle success
-      if (result.success && result.platformPostId) {
+      if (result.success && result.postId) {
         // Update post status to 'published'
         await supabase
           .from('posts')
@@ -126,7 +127,7 @@ export async function publishScheduledPosts(): Promise<{
           .update({
             status: 'published',
             published_at: new Date().toISOString(),
-            platform_post_id: result.platformPostId,
+            platform_post_id: result.postId,
           })
           .eq('id', postId)
 
@@ -137,7 +138,7 @@ export async function publishScheduledPosts(): Promise<{
           step: 'publishing',
           status: 'success',
           message: `Post published to ${platform}`,
-          metadata: { post_id: postId, platform_post_id: result.platformPostId, platform },
+          metadata: { post_id: postId, platform_post_id: result.postId, platform },
         })
 
         console.log(`[Publisher] ✅ Post ${postId} published to ${platform}`)

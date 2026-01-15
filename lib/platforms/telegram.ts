@@ -1,4 +1,5 @@
-import type { PublishResult, EngagementMetrics, PublishArgs } from './types'
+import type { PublishArgs, PublishResult } from '@/lib/pipeline/types'
+import type { EngagementMetrics } from './types'
 
 export async function publishToTelegram(
   args: PublishArgs
@@ -43,7 +44,7 @@ export async function publishToTelegram(
 
     return {
       success: true,
-      platformPostId: data.result.message_id.toString(),
+      postId: data.result.message_id.toString(),
     }
   } catch (error) {
     return {

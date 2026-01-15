@@ -1,4 +1,5 @@
-import type { PublishResult, EngagementMetrics, PublishArgs } from './types'
+import type { PublishArgs, PublishResult } from '@/lib/pipeline/types'
+import type { EngagementMetrics } from './types'
 import { decrypt } from '@/lib/crypto/encryption'
 import { postTweetOAuth1, type XOAuth1Credentials } from '@/lib/oauth/x-oauth1'
 
@@ -31,7 +32,7 @@ export async function publishToX(
 
     return {
       success: true,
-      platformPostId: result.id,
+      postId: result.id,
     }
   } catch (error) {
     return {
