@@ -6,8 +6,6 @@ export const runtime = 'nodejs'
 // Define types for query results
 type UserProfile = {
   autopilot_enabled: boolean | null
-  ai_provider: string | null
-  ai_api_key: string | null
   topics: string[] | null
 }
 
@@ -29,10 +27,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Fetch profile with required fields
+  // Fetch profile with required fields (no AI keys - those come from env)
   const { data: profileData, error } = await supabase
     .from('user_profiles')
-    .select('autopilot_enabled, ai_provider, ai_api_key, topics')
+    .select('autopilot_enabled, topics')
     .eq('id', user.id)
     .single()
 
@@ -60,9 +58,9 @@ export async function GET() {
 
   const schedule = scheduleData as ScheduleConfig | null
 
-  // Calculate requirements
+  // Calculate requirements - AI is always ready if env var is set
   const requirements = {
-    aiConnected: !!(profile?.ai_provider && profile?.ai_api_key),
+    aiConnected: !!process.env.CLAUDE_API_KEY, // Check env var instead of user profile
     hasTopics: !!(profile?.topics && profile.topics.length > 0),
     hasAccounts: !!(accounts && accounts.length > 0),
     hasSchedule: !!(schedule?.days_of_week && schedule.days_of_week.length > 0 && schedule?.times && schedule.times.length > 0),

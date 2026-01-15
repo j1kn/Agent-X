@@ -5,18 +5,12 @@ import { useEffect, useState } from 'react'
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [validating, setValidating] = useState(false)
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'anthropic'>('gemini')
-  const [aiApiKey, setAiApiKey] = useState('')
-  const [defaultModel, setDefaultModel] = useState('')
   const [topics, setTopics] = useState<string[]>([])
   const [newTopic, setNewTopic] = useState('')
   const [tone, setTone] = useState('')
   const [frequency, setFrequency] = useState<'daily' | 'twice_daily' | 'weekly'>('daily')
   const [success, setSuccess] = useState(false)
   const [isAiConnected, setIsAiConnected] = useState(false)
-  const [validationMessage, setValidationMessage] = useState('')
-  const [validationStatus, setValidationStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
   useEffect(() => {
     fetchSettings()
@@ -28,8 +22,6 @@ export default function SettingsPage() {
       const data = await response.json()
 
       if (data.profile) {
-        setAiProvider(data.profile.ai_provider || 'gemini')
-        setDefaultModel(data.profile.default_model || '')
         setTopics(data.profile.topics || [])
         setTone(data.profile.tone || '')
         setFrequency(data.profile.posting_frequency || 'daily')
@@ -43,57 +35,16 @@ export default function SettingsPage() {
     }
   }
 
-  const handleTestConnection = async () => {
-    if (!aiApiKey) {
-      setValidationMessage('Please enter an API key to test')
-      setValidationStatus('error')
-      return
-    }
-
-    setValidating(true)
-    setValidationMessage('')
-    setValidationStatus('idle')
-
-    try {
-      const response = await fetch('/api/settings/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: aiProvider, api_key: aiApiKey }),
-      })
-
-      const data = await response.json()
-
-      if (data.valid) {
-        setValidationStatus('success')
-        setValidationMessage(data.message || 'Connection successful!')
-      } else {
-        setValidationStatus('error')
-        setValidationMessage(data.message || 'Connection failed')
-      }
-    } catch (error) {
-      setValidationStatus('error')
-      setValidationMessage('Failed to test connection')
-    } finally {
-      setValidating(false)
-    }
-  }
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setSuccess(false)
 
     try {
-      const payload: any = {
-        ai_provider: aiProvider,
-        default_model: defaultModel,
+      const payload = {
         topics,
         tone,
         posting_frequency: frequency,
-      }
-
-      if (aiApiKey) {
-        payload.ai_api_key = aiApiKey
       }
 
       const response = await fetch('/api/settings', {
@@ -109,10 +60,6 @@ export default function SettingsPage() {
       }
 
       setSuccess(true)
-      if (aiApiKey) {
-        setIsAiConnected(true) // Update connection status
-        setAiApiKey('') // Clear API key input after saving
-      }
     } catch (error) {
       console.error('Failed to save settings:', error)
       alert('Failed to save settings')
@@ -132,15 +79,6 @@ export default function SettingsPage() {
     setTopics(topics.filter(t => t !== topic))
   }
 
-  const getProviderName = (provider: string) => {
-    switch (provider) {
-      case 'gemini': return 'Google Gemini'
-      case 'openai': return 'OpenAI'
-      case 'anthropic': return 'Anthropic'
-      default: return provider
-    }
-  }
-
   if (loading) {
     return <div className="text-gray-900 dark:text-white">Loading...</div>
   }
@@ -158,131 +96,27 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* AI Connection Status Card */}
+        {/* AI Status Card - Read Only */}
         <div className={`rounded-lg p-6 ${isAiConnected ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className={`w-3 h-3 rounded-full ${isAiConnected ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
               <div>
                 <h3 className={`font-semibold ${isAiConnected ? 'text-green-800 dark:text-green-200' : 'text-yellow-800 dark:text-yellow-200'}`}>
-                  {isAiConnected ? '✓ AI Model Connected' : '⚠ AI Model Not Connected'}
+                  {isAiConnected ? '✓ AI Powered by Claude' : '⚠ AI Not Available'}
                 </h3>
                 <p className={`text-sm ${isAiConnected ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                   {isAiConnected 
-                    ? `Using ${getProviderName(aiProvider)} for content generation` 
-                    : 'Add your API key below to enable AI-powered post generation'}
+                    ? 'Using built-in Claude 3.5 Sonnet for content generation' 
+                    : 'Contact administrator to configure Claude API key'}
                 </p>
               </div>
             </div>
             {isAiConnected && (
               <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                Ready for Autopilot
+                Ready
               </span>
             )}
-          </div>
-        </div>
-
-        {/* AI Provider */}
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-            AI Configuration
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                AI Provider
-              </label>
-              <select
-                value={aiProvider}
-                onChange={(e) => {
-                  setAiProvider(e.target.value as any)
-                  setValidationStatus('idle')
-                  setValidationMessage('')
-                }}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-gray-900"
-              >
-                <option value="gemini">Google Gemini</option>
-                <option value="openai">OpenAI (GPT-4)</option>
-                <option value="anthropic">Anthropic (Claude)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                API Key
-              </label>
-              <div className="mt-1 flex space-x-2">
-                <input
-                  type="password"
-                  value={aiApiKey}
-                  onChange={(e) => {
-                    setAiApiKey(e.target.value)
-                    setValidationStatus('idle')
-                    setValidationMessage('')
-                  }}
-                  className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900"
-                  placeholder={isAiConnected ? 'API key saved • Enter new key to replace' : 'Paste your API key here'}
-                />
-                <button
-                  type="button"
-                  onClick={handleTestConnection}
-                  disabled={validating || !aiApiKey}
-                  className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {validating ? 'Testing...' : 'Test Connection'}
-                </button>
-              </div>
-              
-              {/* Validation feedback */}
-              {validationMessage && (
-                <p className={`mt-2 text-sm ${validationStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                  {validationStatus === 'success' ? '✓ ' : '✗ '}{validationMessage}
-                </p>
-              )}
-              
-              <p className="mt-1 text-xs text-gray-500">
-                Your API key is stored securely and never exposed to the client.
-                {aiProvider === 'gemini' && ' Get your key from Google AI Studio.'}
-                {aiProvider === 'openai' && ' Get your key from OpenAI Dashboard.'}
-                {aiProvider === 'anthropic' && ' Get your key from Anthropic Console.'}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Default Model
-              </label>
-              <select
-                value={defaultModel}
-                onChange={(e) => setDefaultModel(e.target.value)}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-gray-900"
-              >
-                <option value="">Auto (provider default)</option>
-                {aiProvider === 'gemini' && (
-                  <>
-                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast)</option>
-                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (Advanced)</option>
-                  </>
-                )}
-                {aiProvider === 'openai' && (
-                  <>
-                    <option value="gpt-4">GPT-4</option>
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                  </>
-                )}
-                {aiProvider === 'anthropic' && (
-                  <>
-                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                  </>
-                )}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Select the AI model for content generation.
-              </p>
-            </div>
           </div>
         </div>
 
@@ -301,7 +135,7 @@ export default function SettingsPage() {
                 value={newTopic}
                 onChange={(e) => setNewTopic(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTopic())}
-                className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900"
+                className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                 placeholder="e.g., AI automation, developer productivity"
               />
               <button
@@ -320,13 +154,13 @@ export default function SettingsPage() {
               {topics.map((topic) => (
                 <span
                   key={topic}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800"
+                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-200"
                 >
                   {topic}
                   <button
                     type="button"
                     onClick={() => removeTopic(topic)}
-                    className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full text-indigo-600 hover:bg-indigo-200"
+                    className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full text-indigo-600 hover:bg-indigo-200 dark:text-indigo-400 dark:hover:bg-indigo-800"
                   >
                     ×
                   </button>
@@ -350,10 +184,10 @@ export default function SettingsPage() {
                 type="text"
                 value={tone}
                 onChange={(e) => setTone(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                 placeholder="e.g., professional, casual, humorous"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 The tone Agent X will use when generating posts.
               </p>
             </div>
@@ -365,7 +199,7 @@ export default function SettingsPage() {
               <select
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value as any)}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-gray-900"
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-gray-900 dark:bg-gray-700 dark:text-white dark:border-gray-600"
               >
                 <option value="daily">Daily</option>
                 <option value="twice_daily">Twice Daily</option>
@@ -389,7 +223,7 @@ export default function SettingsPage() {
                 {isAiConnected ? '✓' : '1'}
               </span>
               <span className={isAiConnected ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}>
-                Connect AI Model (above)
+                AI Powered by Claude (built-in)
               </span>
             </li>
             <li className="flex items-center space-x-2">
@@ -409,11 +243,17 @@ export default function SettingsPage() {
             <li className="flex items-center space-x-2">
               <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">4</span>
               <span className="text-gray-600 dark:text-gray-400">
-                <a href="/schedule" className="text-indigo-600 hover:text-indigo-500">Configure schedule</a> (days & times)
+                <a href="/training" className="text-indigo-600 hover:text-indigo-500">Configure training</a> (optional requirements)
               </span>
             </li>
             <li className="flex items-center space-x-2">
               <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">5</span>
+              <span className="text-gray-600 dark:text-gray-400">
+                <a href="/schedule" className="text-indigo-600 hover:text-indigo-500">Configure schedule</a> (days & times)
+              </span>
+            </li>
+            <li className="flex items-center space-x-2">
+              <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">6</span>
               <span className="text-gray-600 dark:text-gray-400">
                 Turn on Autopilot (toggle in top navigation)
               </span>

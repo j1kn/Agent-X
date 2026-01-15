@@ -15,13 +15,14 @@ This is NOT a chatbot. It's an AI-orchestrated workflow engine.
 
 ## 📋 System Architecture
 
-### 5 Control Panels (User Configuration):
+### 4 Control Panels (User Configuration):
 
 1. **Accounts** - Connect X (OAuth 1.0a) and Telegram (Bot Token)
-2. **AI Models** (Settings) - Select provider (Gemini/OpenAI/Anthropic), API key, model
+2. **Settings** - Configure topics, tone, posting preferences
 3. **Training** - Define Agent X constitution (brand voice, topics, guidelines)
 4. **Schedule** - Set posting frequency, days, times
-5. **Settings** - Configure topics, tone, posting preferences
+
+**Note**: AI is powered by a built-in Claude API key (server-side only). Users do NOT need to provide their own AI keys.
 
 ### 1 Autonomous Loop:
 
@@ -53,9 +54,15 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # Token Encryption (generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 TOKEN_ENCRYPTION_KEY=your-64-char-hex-key
+
+# Claude API Key (for AI content generation) - REQUIRED
+CLAUDE_API_KEY=your-anthropic-api-key
 ```
 
-⚠️ **X OAuth credentials are NOT needed** - users provide their own OAuth 1.0a keys manually.
+⚠️ **Important Notes**:
+- **Claude API key is REQUIRED** for Agent X to generate posts
+- **X OAuth credentials are NOT needed** - users provide their own OAuth 1.0a keys manually
+- Get your Claude API key from: https://console.anthropic.com/
 
 ### Step 2: Deploy to Vercel
 
@@ -148,16 +155,16 @@ Go to **Accounts** page:
 4. Enter Bot Token and Channel @username
 5. System validates bot permissions
 
-### 3. Configure AI Models
+### 3. Configure Settings
 
 Go to **Settings**:
 
-1. Select AI Provider (Gemini, OpenAI, or Anthropic)
-2. Paste your API key (from Google AI Studio, OpenAI, or Anthropic)
-3. Select default model (e.g., `gemini-1.5-flash`)
-4. Add topics (e.g., "AI automation", "developer tools")
-5. Set tone (e.g., "professional")
-6. Save
+1. Verify AI status shows "Powered by Claude" (green indicator)
+2. Add topics (e.g., "AI automation", "developer tools")
+3. Set tone (e.g., "professional")
+4. Save
+
+**Note**: AI is pre-configured with Claude 3.5 Sonnet. No API key setup required from users.
 
 ### 4. Define Training Instructions
 

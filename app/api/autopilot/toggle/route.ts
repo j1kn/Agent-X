@@ -5,8 +5,6 @@ export const runtime = 'nodejs'
 
 // Define types for query results
 type UserProfile = {
-  ai_provider: string | null
-  ai_api_key: string | null
   topics: string[] | null
 }
 
@@ -32,21 +30,22 @@ export async function POST(request: Request) {
 
   // If enabling, validate requirements first
   if (autopilot_enabled) {
-    // Check AI is configured
+    // Check AI is configured (via env var)
+    if (!process.env.CLAUDE_API_KEY) {
+      return NextResponse.json({ 
+        error: 'AI not configured. Contact administrator.',
+        missingRequirements: true
+      }, { status: 400 })
+    }
+
+    // Check user has topics configured
     const { data: profileData } = await supabase
       .from('user_profiles')
-      .select('ai_provider, ai_api_key, topics')
+      .select('topics')
       .eq('id', user.id)
       .single()
 
     const profile = profileData as UserProfile | null
-
-    if (!profile?.ai_provider || !profile?.ai_api_key) {
-      return NextResponse.json({ 
-        error: 'AI model not connected. Go to Settings to configure.',
-        missingRequirements: true
-      }, { status: 400 })
-    }
 
     if (!profile?.topics || profile.topics.length === 0) {
       return NextResponse.json({ 

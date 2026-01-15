@@ -1,9 +1,5 @@
-import { generateWithGemini } from './providers/gemini'
-import { generateWithOpenAI } from './providers/openai'
 import { generateWithAnthropic } from './providers/anthropic'
 import { createClient } from '@/lib/supabase/server'
-
-export type AIProvider = 'gemini' | 'openai' | 'anthropic'
 
 export interface GenerateOptions {
   topic: string
@@ -12,57 +8,73 @@ export interface GenerateOptions {
   format?: string
 }
 
+/**
+ * Generate content using built-in Claude API key from env vars
+ * Server-side only - never exposes API key to client
+ */
 export async function generateContent(
   userId: string,
   options: GenerateOptions
 ): Promise<{ content: string; prompt: string; model: string }> {
+  // Read Claude API key from env (server-side only)
+  const claudeApiKey = process.env.CLAUDE_API_KEY
+
+  if (!claudeApiKey) {
+    throw new Error('CLAUDE_API_KEY not configured in environment variables')
+  }
+
   const supabase = await createClient()
 
-  // Fetch user's AI provider, API key, default model, and training instructions (server-only)
-  const { data: profile, error } = await supabase
+  // Fetch user's training instructions only (no AI keys from user)
+  const { data: profileData } = await supabase
     .from('user_profiles')
-    .select('ai_provider, ai_api_key, default_model, training_instructions')
+    .select('training_instructions')
     .eq('id', userId)
     .single()
 
-  // @ts-expect-error - Profile type inference issue
-  if (error || !profile?.ai_provider || !profile?.ai_api_key) {
-    throw new Error('AI provider not configured')
-  }
-
-  const { ai_provider, ai_api_key, default_model, training_instructions } = profile
+  const profile = profileData as { training_instructions?: string | null } | null
+  const trainingInstructions = profile?.training_instructions || undefined
 
   // Build prompt with training instructions
-  const prompt = buildPrompt(options, training_instructions)
+  const prompt = buildPrompt(options, trainingInstructions || undefined)
 
-  // Generate content based on provider
+  // Always use Claude (built-in provider)
+  const model = 'claude-3-5-sonnet-20241022'
   let content: string
-  let model: string
 
   try {
-    switch (ai_provider) {
-      case 'gemini':
-        model = default_model || 'gemini-1.5-flash'
-        content = await generateWithGemini(ai_api_key, prompt, model)
-        break
-      case 'openai':
-        model = default_model || 'gpt-4'
-        content = await generateWithOpenAI(ai_api_key, prompt)
-        break
-      case 'anthropic':
-        model = default_model || 'claude-3-5-sonnet-20241022'
-        content = await generateWithAnthropic(ai_api_key, prompt)
-        break
-      default:
-        throw new Error(`Unsupported AI provider: ${ai_provider}`)
-    }
+    content = await generateWithAnthropic(claudeApiKey, prompt, model)
   } catch (error) {
+    console.error('[AI Generator] Claude API error:', error)
     throw new Error(`AI generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 
   // Validate content
   if (!content || content.trim().length === 0) {
     throw new Error('Generated content is empty')
+  }
+
+  // Log AI usage for tracking (per-user)
+  try {
+    await supabase
+      .from('pipeline_logs')
+      // @ts-expect-error - Supabase insert type inference issue
+      .insert({
+        user_id: userId,
+        step: 'generation',
+        status: 'success',
+        message: 'AI content generated using Claude',
+        metadata: {
+          model,
+          provider: 'anthropic',
+          prompt_length: prompt.length,
+          content_length: content.trim().length,
+          timestamp: new Date().toISOString(),
+        },
+      })
+  } catch (logError) {
+    // Don't fail generation if logging fails
+    console.error('[AI Generator] Failed to log usage:', logError)
   }
 
   return {

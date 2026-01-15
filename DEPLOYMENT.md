@@ -4,10 +4,10 @@
 
 1. **Supabase Project** - Already set up with tables created
 2. **Vercel Account** - For hosting
-3. **Platform Credentials**:
-   - Telegram Bot Token & Username
-   - X (Twitter) API credentials (Client ID, Client Secret)
-4. **AI Model API Key** - Gemini, OpenAI, or Anthropic
+3. **Claude API Key** - From Anthropic (https://console.anthropic.com/)
+4. **Platform Credentials**:
+   - Users will provide their own X OAuth 1.0a credentials
+   - Users will provide their own Telegram Bot Token
 
 ## Environment Variables
 
@@ -19,18 +19,21 @@ NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
-# OAuth (Telegram Bot)
-TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-TELEGRAM_BOT_USERNAME=your-telegram-bot-username
+# Token Encryption (generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+TOKEN_ENCRYPTION_KEY=your-64-char-hex-key
 
-# OAuth (X/Twitter)
-X_CLIENT_ID=your-x-client-id
-X_CLIENT_SECRET=your-x-client-secret
-X_REDIRECT_URI=https://your-vercel-domain.vercel.app/api/accounts/callback/x
+# Claude API Key (REQUIRED for AI content generation)
+CLAUDE_API_KEY=your-anthropic-api-key
 
 # Auto-set by Vercel
 VERCEL_URL=
 ```
+
+**Important Notes**:
+- **CLAUDE_API_KEY is REQUIRED** - All AI generation uses Claude 3.5 Sonnet
+- Get your Claude key from: https://console.anthropic.com/
+- Users do NOT need to provide their own AI keys
+- X and Telegram credentials are entered by users in the app (not env vars)
 
 ## Deployment Steps
 
@@ -127,18 +130,16 @@ SELECT * FROM cron.job;
 
 1. Sign up / Log in at `https://your-domain.vercel.app`
 2. Go to Settings and configure:
-   - AI Provider (Gemini, OpenAI, or Anthropic)
-   - AI API Key
-   - Topics
-   - Tone
-   - Posting Frequency
+   - Verify "Powered by Claude" status is green
+   - Add topics
+   - Set tone
+   - Save
 3. Go to Accounts and connect:
-   - Telegram account
-   - X (Twitter) account
-4. Go to Dashboard and click "Generate Post"
-5. Check Posts page to see scheduled posts
-6. Wait for cron to publish (or manually trigger)
-7. Check Metrics page after posts are published
+   - X account (enter OAuth 1.0a credentials manually)
+   - Telegram account (enter bot token and channel)
+4. Go to Schedule and set posting times
+5. Turn on Autopilot in the top nav
+6. Agent X will now post automatically at scheduled times
 
 ## Manual Cron Testing
 
@@ -181,10 +182,11 @@ SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
 
 ## Security Notes
 
-- AI API keys are stored encrypted in Supabase (server-only)
+- Claude API key is stored in Vercel env vars (server-only, never exposed to client)
+- User social media credentials (X OAuth 1.0a, Telegram bot tokens) are encrypted with AES-256-GCM
 - Service role key should never be exposed to the client
-- Row Level Security (RLS) is enabled on all tables
-- OAuth tokens are stored encrypted
+- Row Level Security (RLS) is enabled on all tables for multi-user support
+- All AI generation happens server-side with built-in Claude key
 
 ## Maintenance
 
@@ -222,14 +224,13 @@ SELECT cron.unschedule('publish-posts');
 
 ## Production Checklist
 
-- [ ] All environment variables set in Vercel
+- [ ] All environment variables set in Vercel (including CLAUDE_API_KEY)
 - [ ] Supabase cron jobs configured
 - [ ] Test user account created
-- [ ] AI API key configured
-- [ ] Platform accounts connected
+- [ ] Claude API key verified (check Settings page shows green status)
+- [ ] Platform accounts connected (X OAuth 1.0a + Telegram bot)
 - [ ] Test post generated and published
-- [ ] Metrics collecting successfully
-- [ ] Learning loop running daily
+- [ ] Autopilot enabled and running
 - [ ] Monitoring and alerts set up (optional)
 
 ## Next Steps
