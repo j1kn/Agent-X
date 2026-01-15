@@ -63,7 +63,7 @@ export async function generatePost(
     .eq('user_id', userId)
     .single()
 
-  const scheduleConfig: ScheduleConfig = scheduleData as ScheduleConfig || {}
+  const scheduleConfig: ScheduleConfig = (scheduleData as ScheduleConfig | null) || {}
 
   // 6. Calculate next scheduled time (smart scheduling)
   const scheduledTime = getNextScheduledAt(scheduleConfig)
