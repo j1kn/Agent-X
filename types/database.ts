@@ -45,7 +45,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          platform: 'telegram' | 'x' | 'linkedin' | 'linkedin'
+          platform: 'telegram' | 'x' | 'linkedin'
           platform_user_id: string
           access_token: string
           refresh_token: string | null
@@ -58,7 +58,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          platform: 'telegram' | 'x' | 'linkedin' | 'linkedin'
+          platform: 'telegram' | 'x' | 'linkedin'
           platform_user_id: string
           access_token: string
           refresh_token?: string | null
@@ -87,7 +87,7 @@ export interface Database {
           id: string
           user_id: string
           account_id: string
-          status: 'draft' | 'scheduled' | 'published' | 'failed'
+          status: 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed'
           content: string
           platform: 'telegram' | 'x' | 'linkedin'
           scheduled_for: string | null
@@ -104,7 +104,7 @@ export interface Database {
           id?: string
           user_id: string
           account_id: string
-          status?: 'draft' | 'scheduled' | 'published' | 'failed'
+          status?: 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed'
           content: string
           platform: 'telegram' | 'x' | 'linkedin'
           scheduled_for?: string | null
@@ -121,9 +121,9 @@ export interface Database {
           id?: string
           user_id?: string
           account_id?: string
-          status?: 'draft' | 'scheduled' | 'published' | 'failed'
+          status?: 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed'
           content?: string
-          platform?: 'telegram' | 'x'
+          platform?: 'telegram' | 'x' | 'linkedin'
           scheduled_for?: string | null
           published_at?: string | null
           platform_post_id?: string | null
