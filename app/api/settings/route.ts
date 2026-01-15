@@ -33,10 +33,6 @@ export async function GET() {
 
   // AI is always connected via built-in Claude key
   const isAiConnected = !!process.env.CLAUDE_API_KEY
-  
-  // Debug logging (remove after confirming it works)
-  console.log('[Settings API] CLAUDE_API_KEY present:', !!process.env.CLAUDE_API_KEY)
-  console.log('[Settings API] CLAUDE_API_KEY length:', process.env.CLAUDE_API_KEY?.length || 0)
 
   return NextResponse.json({ 
     profile: profile ? {

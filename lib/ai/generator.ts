@@ -16,24 +16,10 @@ export async function generateContent(
   userId: string,
   options: GenerateOptions
 ): Promise<{ content: string; prompt: string; model: string }> {
-  // #region agent log
-  console.log('[DEBUG generator.ts:15] generateContent ENTRY', {userId,topic:options.topic,hasClaudeKey:!!process.env.CLAUDE_API_KEY,keyLength:process.env.CLAUDE_API_KEY?.length||0,vercelEnv:process.env.VERCEL_ENV,nodeEnv:process.env.NODE_ENV,allEnvKeys:Object.keys(process.env).filter(k=>k.includes('CLAUDE')||k.includes('VERCEL')||k.includes('NODE'))});
-  fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/ai/generator.ts:15',message:'generateContent ENTRY',data:{userId,topic:options.topic,hasClaudeKey:!!process.env.CLAUDE_API_KEY,keyLength:process.env.CLAUDE_API_KEY?.length||0,vercelEnv:process.env.VERCEL_ENV,nodeEnv:process.env.NODE_ENV,allEnvKeys:Object.keys(process.env).filter(k=>k.includes('CLAUDE')||k.includes('VERCEL')||k.includes('NODE'))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C,E'})}).catch(()=>{});
-  // #endregion
-  
   // Read Claude API key from env (server-side only)
   const claudeApiKey = process.env.CLAUDE_API_KEY
 
-  // #region agent log
-  console.log('[DEBUG generator.ts:20] After reading CLAUDE_API_KEY', {hasKey:!!claudeApiKey,keyLength:claudeApiKey?.length||0,keyPrefix:claudeApiKey?.substring(0,10)||'NONE'});
-  fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/ai/generator.ts:20',message:'After reading CLAUDE_API_KEY',data:{hasKey:!!claudeApiKey,keyLength:claudeApiKey?.length||0,keyPrefix:claudeApiKey?.substring(0,10)||'NONE'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C'})}).catch(()=>{});
-  // #endregion
-
   if (!claudeApiKey) {
-    // #region agent log
-    console.error('[DEBUG generator.ts:23] THROWING ERROR - claudeApiKey is falsy', {claudeApiKey:String(claudeApiKey),typeOf:typeof claudeApiKey});
-    fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/ai/generator.ts:23',message:'THROWING ERROR - claudeApiKey is falsy',data:{claudeApiKey:String(claudeApiKey),typeOf:typeof claudeApiKey},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C,E'})}).catch(()=>{});
-    // #endregion
     throw new Error('CLAUDE_API_KEY not configured in environment variables')
   }
 
@@ -52,8 +38,8 @@ export async function generateContent(
   // Build prompt with training instructions
   const prompt = buildPrompt(options, trainingInstructions || undefined)
 
-  // Always use Claude (built-in provider)
-  const model = 'claude-3-5-sonnet-20241022'
+  // Always use Claude (built-in provider) with latest model
+  const model = 'claude-3-5-sonnet-latest'
   let content: string
 
   try {
