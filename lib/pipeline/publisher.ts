@@ -93,10 +93,11 @@ export async function publishScheduledPosts(): Promise<{
 
       switch (platform) {
         case 'telegram':
-          // For Telegram: platformUserId is the channel username
+          // For Telegram: platformUserId must be NUMERIC chat_id from platform_user_id
+          // Bot must be added to channel/group as administrator
           result = await publishToTelegram({
             ...publishArgs,
-            platformUserId: account.username, // Telegram uses username field
+            platformUserId: account.platform_user_id, // Telegram requires numeric chat_id
           })
           break
 

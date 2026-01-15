@@ -9,50 +9,78 @@ export async function publishToTelegram(
 ): Promise<PublishResult> {
   const { accessToken, platformUserId, content } = args
   
-  // platformUserId is the Telegram channel username (e.g., @mychannel)
-  const username = platformUserId || ''
-  if (!username) {
+  // Telegram requires NUMERIC chat_id (not @username)
+  // chat_id must come from platform_user_id (stored as string, but must be numeric)
+  const chatId = platformUserId || ''
+  
+  // Guard: Ensure chat_id is numeric
+  if (!chatId || isNaN(Number(chatId))) {
+    const errorMsg = `Telegram chat_id must be numeric. Got: ${chatId || 'undefined'}. Use platform_user_id from connected_accounts.`
+    console.error('[Telegram] Invalid chat_id:', { chatId, platformUserId })
     return {
       success: false,
-      error: 'Telegram channel username (platformUserId) is required',
+      error: errorMsg,
     }
   }
 
   try {
-    // Telegram Bot API - send message to channel
-    // The accessToken here is the bot token
-    // The username should be the channel username (e.g., @mychannel)
+    // Telegram Bot API - send message to channel/group
+    // Bot must be added to channel/group as administrator
+    // chat_id must be numeric (channel/group ID, not username)
     const url = `https://api.telegram.org/bot${accessToken}/sendMessage`
+
+    const requestBody = {
+      chat_id: Number(chatId), // Convert to number for Telegram API
+      text: content,
+      parse_mode: 'HTML',
+    }
+
+    console.log('[Telegram] Publishing to chat_id:', chatId)
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        chat_id: username,
-        text: content,
-        parse_mode: 'HTML',
-      }),
+      body: JSON.stringify(requestBody),
     })
 
     const data = await response.json()
 
+    // Log FULL API response when error occurs
     if (!response.ok || !data.ok) {
+      const errorDetails = {
+        error_code: data.error_code || 'unknown',
+        description: data.description || 'No description provided',
+        chat_id: chatId,
+        response_status: response.status,
+        full_response: data,
+      }
+      
+      console.error('[Telegram] API Error:', JSON.stringify(errorDetails, null, 2))
+      
+      // Build descriptive error message
+      const errorMessage = `Telegram API error (code: ${errorDetails.error_code}): ${errorDetails.description}. chat_id: ${chatId}`
+      
       return {
         success: false,
-        error: data.description || 'Failed to publish to Telegram',
+        error: errorMessage,
       }
     }
 
+    console.log('[Telegram] Published successfully:', data.result.message_id)
+    
     return {
       success: true,
       postId: data.result.message_id.toString(),
     }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Telegram] Exception:', { error: errorMessage, chat_id: chatId })
+    
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: `Telegram publishing exception: ${errorMessage}. chat_id: ${chatId}`,
     }
   }
 }
