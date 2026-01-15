@@ -25,6 +25,11 @@ TOKEN_ENCRYPTION_KEY=your-64-char-hex-key
 # Claude API Key (REQUIRED for AI content generation)
 CLAUDE_API_KEY=your-anthropic-api-key
 
+# LinkedIn OAuth (OPTIONAL - for Company Page posting)
+LINKEDIN_CLIENT_ID=your-linkedin-client-id
+LINKEDIN_CLIENT_SECRET=your-linkedin-client-secret
+LINKEDIN_REDIRECT_URI=https://your-domain.vercel.app/api/accounts/linkedin/callback
+
 # Auto-set by Vercel
 VERCEL_URL=
 ```
@@ -32,6 +37,8 @@ VERCEL_URL=
 **Important Notes**:
 - **CLAUDE_API_KEY is REQUIRED** - All AI generation uses Claude 3.5 Sonnet
 - Get your Claude key from: https://console.anthropic.com/
+- **LinkedIn OAuth is OPTIONAL** - Only needed for LinkedIn Company Page posting
+- Create LinkedIn app at: https://www.linkedin.com/developers/apps
 - Users do NOT need to provide their own AI keys
 - X and Telegram credentials are entered by users in the app (not env vars)
 
@@ -137,9 +144,10 @@ SELECT * FROM cron.job;
 3. Go to Accounts and connect:
    - X account (enter OAuth 1.0a credentials manually)
    - Telegram account (enter bot token and channel)
+   - LinkedIn Company Page (OAuth 2.0 flow - optional)
 4. Go to Schedule and set posting times
 5. Turn on Autopilot in the top nav
-6. Agent X will now post automatically at scheduled times
+6. Agent X will now post automatically to all connected platforms at scheduled times
 
 ## Manual Cron Testing
 

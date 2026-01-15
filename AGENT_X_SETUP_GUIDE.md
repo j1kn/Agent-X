@@ -17,7 +17,7 @@ This is NOT a chatbot. It's an AI-orchestrated workflow engine.
 
 ### 4 Control Panels (User Configuration):
 
-1. **Accounts** - Connect X (OAuth 1.0a) and Telegram (Bot Token)
+1. **Accounts** - Connect X (OAuth 1.0a), Telegram (Bot Token), and LinkedIn (OAuth 2.0)
 2. **Settings** - Configure topics, tone, posting preferences
 3. **Training** - Define Agent X constitution (brand voice, topics, guidelines)
 4. **Schedule** - Set posting frequency, days, times
@@ -57,12 +57,19 @@ TOKEN_ENCRYPTION_KEY=your-64-char-hex-key
 
 # Claude API Key (for AI content generation) - REQUIRED
 CLAUDE_API_KEY=your-anthropic-api-key
+
+# LinkedIn OAuth (for Company Page posting)
+LINKEDIN_CLIENT_ID=your-linkedin-client-id
+LINKEDIN_CLIENT_SECRET=your-linkedin-client-secret
+LINKEDIN_REDIRECT_URI=https://your-domain.vercel.app/api/accounts/linkedin/callback
 ```
 
 ⚠️ **Important Notes**:
-- **Claude API key is REQUIRED** for Agent X to generate posts
+- **CLAUDE_API_KEY is REQUIRED** for Agent X to generate posts
 - **X OAuth credentials are NOT needed** - users provide their own OAuth 1.0a keys manually
+- **LinkedIn OAuth is optional** - only needed if users want to post to Company Pages
 - Get your Claude API key from: https://console.anthropic.com/
+- Get LinkedIn OAuth credentials from: https://www.linkedin.com/developers/apps
 
 ### Step 2: Deploy to Vercel
 

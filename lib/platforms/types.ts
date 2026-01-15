@@ -10,5 +10,5 @@ export interface EngagementMetrics {
   views: number
 }
 
-export type Platform = 'telegram' | 'x'
+export type Platform = 'telegram' | 'x' | 'linkedin'
 

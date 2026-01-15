@@ -20,6 +20,7 @@ import { selectNextTopic, extractRecentTopics } from '@/lib/autopilot/topicSelec
 import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
+import { publishToLinkedIn } from '@/lib/platforms/linkedin'
 import type { Database } from '@/types/database'
 
 export const runtime = 'nodejs'
@@ -161,6 +162,24 @@ export async function POST(request: Request) {
               publishResult = await publishToX(account.access_token, content)
             } else if (account.platform === 'telegram') {
               publishResult = await publishToTelegram(account.access_token, account.username, content)
+            } else if (account.platform === 'linkedin') {
+              // LinkedIn requires organization ID and checks token expiration
+              publishResult = await publishToLinkedIn(
+                account.access_token,
+                account.platform_user_id,
+                content,
+                account.token_expires_at
+              )
+              
+              // If token expired, mark account as inactive
+              if (!publishResult.success && publishResult.error?.includes('expired')) {
+                await supabase
+                  .from('connected_accounts')
+                  // @ts-expect-error - Supabase update type inference issue
+                  .update({ is_active: false })
+                  .eq('id', account.id)
+                console.warn(`Marked LinkedIn account ${account.id} as inactive due to expired token`)
+              }
             } else {
               throw new Error(`Unsupported platform: ${account.platform}`)
             }

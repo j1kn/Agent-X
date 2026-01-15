@@ -11,6 +11,9 @@ export default function AccountsPage() {
   const [telegramData, setTelegramData] = useState({ botToken: '', channelUsername: '' })
   const [showXModal, setShowXModal] = useState(false)
   const [xData, setXData] = useState({ apiKey: '', apiSecret: '', accessToken: '', accessTokenSecret: '' })
+  const [showLinkedInModal, setShowLinkedInModal] = useState(false)
+  const [linkedInOrgs, setLinkedInOrgs] = useState<any[]>([])
+  const [linkedInAuthData, setLinkedInAuthData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   
@@ -23,12 +26,27 @@ export default function AccountsPage() {
     // Check for success/error params from OAuth redirect
     const successParam = searchParams.get('success')
     const errorParam = searchParams.get('error')
+    const linkedInAuth = searchParams.get('linkedin_auth')
+    const linkedInData = searchParams.get('data')
     
     if (successParam === 'x_connected') {
       setSuccess('X account connected successfully!')
       // Clean URL
       router.replace('/accounts')
       fetchAccounts()
+    } else if (linkedInAuth === 'success' && linkedInData) {
+      // LinkedIn OAuth callback - decode organization data
+      try {
+        const decoded = JSON.parse(Buffer.from(decodeURIComponent(linkedInData), 'base64').toString())
+        setLinkedInAuthData(decoded)
+        setLinkedInOrgs(decoded.organizations || [])
+        setShowLinkedInModal(true)
+        // Clean URL
+        router.replace('/accounts')
+      } catch (err) {
+        setError('Failed to process LinkedIn connection')
+        router.replace('/accounts')
+      }
     } else if (errorParam) {
       setError(`Connection failed: ${errorParam}`)
       router.replace('/accounts')
@@ -130,6 +148,48 @@ export default function AccountsPage() {
     }
   }
 
+  const handleConnectLinkedIn = () => {
+    // Redirect to LinkedIn OAuth flow
+    window.location.href = '/api/accounts/linkedin/connect'
+  }
+
+  const handleLinkedInOrgSelect = async (orgId: string, orgName: string) => {
+    setConnecting(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/accounts/linkedin/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          access_token: linkedInAuthData.access_token,
+          expires_in: linkedInAuthData.expires_in,
+          organization_id: orgId,
+          organization_name: orgName,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        setError(data.error)
+      } else if (data.success) {
+        setSuccess(`LinkedIn Company Page "${orgName}" connected successfully!`)
+        setShowLinkedInModal(false)
+        setLinkedInAuthData(null)
+        setLinkedInOrgs([])
+        fetchAccounts()
+      }
+    } catch (error) {
+      console.error('Failed to save LinkedIn connection:', error)
+      setError('Failed to save LinkedIn connection')
+    } finally {
+      setConnecting(false)
+    }
+  }
+
   const handleDisconnect = async (accountId: string) => {
     if (!confirm('Are you sure you want to disconnect this account?')) {
       return
@@ -191,7 +251,7 @@ export default function AccountsPage() {
         <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
           Connect New Account
         </h2>
-        <div className="flex space-x-4">
+        <div className="flex space-x-4 flex-wrap gap-2">
           <button
             onClick={handleConnectTelegram}
             disabled={connecting}
@@ -205,6 +265,13 @@ export default function AccountsPage() {
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50"
           >
             {connecting ? 'Connecting...' : 'Connect X (Manual)'}
+          </button>
+          <button
+            onClick={handleConnectLinkedIn}
+            disabled={connecting}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50"
+          >
+            Connect LinkedIn Company Page
           </button>
         </div>
       </div>
@@ -223,13 +290,25 @@ export default function AccountsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {account.platform === 'telegram' ? 'Telegram' : 'X (Twitter)'}
+                      {account.platform === 'telegram' && 'Telegram'}
+                      {account.platform === 'x' && 'X (Twitter)'}
+                      {account.platform === 'linkedin' && 'LinkedIn Company Page'}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      @{account.username}
+                      {account.platform === 'linkedin' ? account.username : `@${account.username}`}
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500">
                       {account.is_active ? 'Active' : 'Inactive'}
+                      {account.platform === 'linkedin' && account.token_expires_at && (
+                        <span className="ml-2">
+                          {new Date(account.token_expires_at) <= new Date() 
+                            ? '• Token expired' 
+                            : new Date(account.token_expires_at) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                              ? '• Token expires soon'
+                              : ''
+                          }
+                        </span>
+                      )}
                     </p>
                   </div>
                   <button
@@ -402,6 +481,49 @@ export default function AccountsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* LinkedIn Organization Selection Modal */}
+      {showLinkedInModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Select LinkedIn Company Page
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Choose which Company Page you want to connect for posting:
+            </p>
+            
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {linkedInOrgs.map((org: any) => (
+                <button
+                  key={org.id}
+                  onClick={() => handleLinkedInOrgSelect(org.id, org.name)}
+                  disabled={connecting}
+                  className="w-full text-left px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                >
+                  <p className="font-medium text-gray-900 dark:text-white">{org.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">ID: {org.id}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLinkedInModal(false)
+                  setLinkedInOrgs([])
+                  setLinkedInAuthData(null)
+                }}
+                disabled={connecting}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
