@@ -8,6 +8,7 @@ export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
   // #region agent log
+  console.log('[DEBUG route.ts:9] API Route ENTRY', {runtime:'nodejs',hasClaudeKey:!!process.env.CLAUDE_API_KEY,vercelEnv:process.env.VERCEL_ENV,nodeEnv:process.env.NODE_ENV,isVercel:!!process.env.VERCEL,vercelUrl:process.env.VERCEL_URL});
   fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/posts/generate/route.ts:9',message:'API Route ENTRY',data:{runtime:'nodejs',hasClaudeKey:!!process.env.CLAUDE_API_KEY,vercelEnv:process.env.VERCEL_ENV,nodeEnv:process.env.NODE_ENV,isVercel:!!process.env.VERCEL,vercelUrl:process.env.VERCEL_URL},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
   // #endregion
   
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
     // #region agent log
+    console.error('[DEBUG route.ts:64] CATCH BLOCK - Error occurred', {errorMessage,errorStack:error instanceof Error?error.stack:'N/A',hasClaudeKey:!!process.env.CLAUDE_API_KEY});
     fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/posts/generate/route.ts:64',message:'CATCH BLOCK - Error occurred',data:{errorMessage,errorStack:error instanceof Error?error.stack:'N/A',hasClaudeKey:!!process.env.CLAUDE_API_KEY},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C,E'})}).catch(()=>{});
     // #endregion
 
