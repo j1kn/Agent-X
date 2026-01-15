@@ -91,10 +91,12 @@ export async function publishScheduledPosts(): Promise<{
         tokenExpiresAt: account.token_expires_at || null,
       }
 
+      // STEP 2.2: Route to platform-specific publisher (ISOLATED - each platform independent)
+      let result
+
       switch (platform) {
         case 'telegram':
-          // For Telegram: platformUserId must be NUMERIC chat_id from platform_user_id
-          // Bot must be added to channel/group as administrator
+          // For Telegram: platformUserId must be numeric chat_id from platform_user_id
           result = await publishToTelegram({
             ...publishArgs,
             platformUserId: account.platform_user_id, // Telegram requires numeric chat_id
@@ -119,7 +121,7 @@ export async function publishScheduledPosts(): Promise<{
           throw new Error(`Unsupported platform: ${platform}`)
       }
 
-      // STEP 2.3: Handle success
+      // STEP 2.3: Handle result (ISOLATED - each platform success/failure independent)
       if (result.success && result.postId) {
         // Update post status to 'published'
         await supabase
@@ -145,7 +147,11 @@ export async function publishScheduledPosts(): Promise<{
         console.log(`[Publisher] ✅ Post ${postId} published to ${platform}`)
         published++
       } else {
-        throw new Error(result.error || 'Unknown publishing error')
+        // Platform-specific failure - throw error to mark this post as failed
+        // This does NOT affect other platforms (isolation maintained)
+        const errorMsg = result.error || 'Unknown publishing error'
+        console.error(`[Publisher] ❌ Post ${postId} failed on ${platform}: ${errorMsg}`)
+        throw new Error(`Failed to publish to ${platform}: ${errorMsg}`)
       }
     } catch (error) {
       // STEP 2.4: Handle failure

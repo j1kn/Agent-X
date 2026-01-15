@@ -170,10 +170,9 @@ export async function POST(request: Request) {
             if (account.platform === 'x') {
               publishResult = await publishToX(publishArgs)
             } else if (account.platform === 'telegram') {
-              // Telegram requires numeric chat_id from platform_user_id
               publishResult = await publishToTelegram({
                 ...publishArgs,
-                platformUserId: account.platform_user_id, // Must be numeric chat_id
+                platformUserId: account.username, // Telegram uses username
               })
             } else if (account.platform === 'linkedin') {
               // LinkedIn requires organization ID and checks token expiration

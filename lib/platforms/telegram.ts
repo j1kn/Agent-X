@@ -7,6 +7,7 @@ import type { EngagementMetrics } from './types'
 export async function publishToTelegram(
   args: PublishArgs
 ): Promise<PublishResult> {
+  // Extract inputs (IMMUTABLE - never reassign)
   const { accessToken, platformUserId, content } = args
   
   // Telegram requires NUMERIC chat_id (not @username)
@@ -23,6 +24,8 @@ export async function publishToTelegram(
     }
   }
 
+  const numericChatId = Number(chatId)
+
   try {
     // Telegram Bot API - send message to channel/group
     // Bot must be added to channel/group as administrator
@@ -30,12 +33,12 @@ export async function publishToTelegram(
     const url = `https://api.telegram.org/bot${accessToken}/sendMessage`
 
     const requestBody = {
-      chat_id: Number(chatId), // Convert to number for Telegram API
+      chat_id: numericChatId, // Convert to number for Telegram API
       text: content,
       parse_mode: 'HTML',
     }
 
-    console.log('[Telegram] Publishing to chat_id:', chatId)
+    console.log('[Telegram] Publishing to chat_id:', numericChatId)
 
     const response = await fetch(url, {
       method: 'POST',
@@ -52,7 +55,7 @@ export async function publishToTelegram(
       const errorDetails = {
         error_code: data.error_code || 'unknown',
         description: data.description || 'No description provided',
-        chat_id: chatId,
+        chat_id: numericChatId,
         response_status: response.status,
         full_response: data,
       }
@@ -60,7 +63,7 @@ export async function publishToTelegram(
       console.error('[Telegram] API Error:', JSON.stringify(errorDetails, null, 2))
       
       // Build descriptive error message
-      const errorMessage = `Telegram API error (code: ${errorDetails.error_code}): ${errorDetails.description}. chat_id: ${chatId}`
+      const errorMessage = `Telegram API error (code: ${errorDetails.error_code}): ${errorDetails.description}. chat_id: ${numericChatId}`
       
       return {
         success: false,
@@ -76,11 +79,11 @@ export async function publishToTelegram(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error('[Telegram] Exception:', { error: errorMessage, chat_id: chatId })
+    console.error('[Telegram] Exception:', { error: errorMessage, chat_id: numericChatId })
     
     return {
       success: false,
-      error: `Telegram publishing exception: ${errorMessage}. chat_id: ${chatId}`,
+      error: `Telegram publishing exception: ${errorMessage}. chat_id: ${numericChatId}`,
     }
   }
 }
