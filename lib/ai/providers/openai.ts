@@ -21,3 +21,4 @@ export async function generateWithOpenAI(
   return completion.choices[0]?.message?.content || ''
 }
 
+

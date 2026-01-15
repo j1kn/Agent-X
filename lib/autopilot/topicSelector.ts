@@ -63,3 +63,4 @@ export function extractRecentTopics(recentPosts: Array<{ topic: string | null }>
     .filter((topic): topic is string => topic !== null && topic !== '')
 }
 
+

@@ -14,3 +14,4 @@ export function validatePostContent(content: string, platform: 'telegram' | 'x')
   return { valid: true }
 }
 
+

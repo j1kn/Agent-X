@@ -59,6 +59,9 @@ export async function GET() {
   const schedule = scheduleData as ScheduleConfig | null
 
   // Calculate requirements - AI is always ready if env var is set
+  // Debug logging
+  console.log('[Autopilot Status] CLAUDE_API_KEY present:', !!process.env.CLAUDE_API_KEY)
+  
   const requirements = {
     aiConnected: !!process.env.CLAUDE_API_KEY, // Check env var instead of user profile
     hasTopics: !!(profile?.topics && profile.topics.length > 0),
