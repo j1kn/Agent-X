@@ -38,8 +38,8 @@ export async function generateContent(
   // Build prompt with training instructions
   const prompt = buildPrompt(options, trainingInstructions || undefined)
 
-  // Always use Claude (built-in provider) with latest model
-  const model = 'claude-3-5-sonnet-latest'
+  // Always use Claude (built-in provider) - Claude Sonnet 4.5
+  const model = 'claude-sonnet-4-5'
   let content: string
 
   try {

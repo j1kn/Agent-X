@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 export async function generateWithAnthropic(
   apiKey: string,
   prompt: string,
-  model: string = 'claude-3-5-sonnet-latest'
+  model: string = 'claude-sonnet-4-5'
 ): Promise<string> {
   if (!apiKey) {
     throw new Error('Anthropic API key is required')
