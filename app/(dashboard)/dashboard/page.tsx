@@ -1,10 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+
+interface PlatformPost {
+  postId: string
+  platform: 'x' | 'telegram' | 'linkedin'
+  content: string
+  scheduledFor: string
+}
+
+interface GenerateResult {
+  success: boolean
+  masterContent: string
+  posts: PlatformPost[]
+}
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<GenerateResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleGeneratePost = async () => {
@@ -62,12 +75,27 @@ export default function DashboardPage() {
             )}
 
             {result && (
-              <div className="mt-4 rounded-md bg-green-50 p-4">
-                <h4 className="text-sm font-medium text-green-800 mb-2">Post Generated!</h4>
-                <p className="text-sm text-green-700 mb-2">{result.content}</p>
-                <p className="text-xs text-green-600">
-                  Scheduled for: {new Date(result.scheduledFor).toLocaleString()}
-                </p>
+              <div className="mt-4 space-y-3">
+                <div className="rounded-md bg-green-50 p-4 border border-green-200">
+                  <h4 className="text-sm font-medium text-green-800 mb-2">
+                    ✅ {result.posts.length} Posts Generated & Scheduled!
+                  </h4>
+                  <p className="text-xs text-green-600 mb-3">
+                    Scheduled for: {new Date(result.posts[0]?.scheduledFor || '').toLocaleString()}
+                  </p>
+                  
+                  {result.posts.map((post) => (
+                    <div key={post.postId} className="mt-3 p-3 bg-white rounded border border-green-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-700 uppercase">
+                          {post.platform === 'x' ? '𝕏 Twitter' : post.platform === 'telegram' ? '✈️ Telegram' : post.platform}
+                        </span>
+                        <span className="text-xs text-gray-500">{post.content.length} chars</span>
+                      </div>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{post.content}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
