@@ -1,6 +1,9 @@
 import type { PublishArgs, PublishResult } from '@/lib/pipeline/types'
 import type { EngagementMetrics } from './types'
 
+// 🚨 RULE: Never mutate destructured args or function inputs.
+// Always derive new variables (finalContent, finalText, etc).
+
 export async function publishToTelegram(
   args: PublishArgs
 ): Promise<PublishResult> {

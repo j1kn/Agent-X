@@ -3,6 +3,9 @@ import type { EngagementMetrics } from './types'
 import { decrypt } from '@/lib/crypto/encryption'
 import { postTweetOAuth1, type XOAuth1Credentials } from '@/lib/oauth/x-oauth1'
 
+// 🚨 RULE: Never mutate destructured args or function inputs.
+// Always derive new variables (finalContent, finalText, etc).
+
 /**
  * Parse and decrypt X OAuth 1.0a credentials from stored JSON
  */

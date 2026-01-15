@@ -2,6 +2,9 @@ import { decrypt } from '@/lib/crypto/encryption'
 import type { PublishArgs, PublishResult } from '@/lib/pipeline/types'
 import type { EngagementMetrics } from './types'
 
+// 🚨 RULE: Never mutate destructured args or function inputs.
+// Always derive new variables (finalContent, finalText, etc).
+
 /**
  * LinkedIn Company Page Posting
  * Uses OAuth 2.0 and UGC (User Generated Content) Posts API
@@ -45,7 +48,8 @@ function isTokenExpired(expiresAt: string | null | undefined): boolean {
 export async function publishToLinkedIn(
   args: PublishArgs
 ): Promise<PublishResult> {
-  const { accessToken: encryptedToken, platformUserId: organizationId, content, tokenExpiresAt } = args
+  // Extract inputs (IMMUTABLE - never reassign)
+  const { accessToken: encryptedToken, platformUserId: organizationId, content: rawContent, tokenExpiresAt } = args
   
   if (!organizationId) {
     return {
@@ -65,10 +69,11 @@ export async function publishToLinkedIn(
     // Decrypt the access token
     const accessToken = decrypt(encryptedToken)
 
-    // Validate content length (LinkedIn allows 3000 chars)
-    if (content.length > 3000) {
+    // Derive final content (never mutate rawContent)
+    let finalContent = rawContent
+    if (rawContent.length > 3000) {
       console.warn('[LinkedIn] Content exceeds 3000 chars, truncating')
-      content = content.substring(0, 2997) + '...'
+      finalContent = rawContent.substring(0, 2997) + '...'
     }
 
     // Build UGC post payload
@@ -78,7 +83,7 @@ export async function publishToLinkedIn(
       specificContent: {
         'com.linkedin.ugc.ShareContent': {
           shareCommentary: {
-            text: content,
+            text: finalContent,
           },
           shareMediaCategory: 'NONE',
         },
