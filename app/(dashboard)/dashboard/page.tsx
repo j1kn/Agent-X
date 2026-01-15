@@ -12,12 +12,24 @@ export default function DashboardPage() {
     setError(null)
     setResult(null)
 
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/page.tsx:10',message:'CLIENT - Generate Post button clicked',data:{environment:'client',hasProcessEnv:typeof process!=='undefined',windowDefined:typeof window!=='undefined'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+
     try {
       const response = await fetch('/api/posts/generate', {
         method: 'POST',
       })
 
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/page.tsx:16',message:'CLIENT - Received response from API',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+
       const data = await response.json()
+
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/page.tsx:20',message:'CLIENT - Parsed JSON response',data:{hasError:!!data.error,errorMsg:data.error||'none'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to generate post')
@@ -25,6 +37,9 @@ export default function DashboardPage() {
 
       setResult(data)
     } catch (err: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cf448d43-4ded-4ee7-8c96-eedcb592b608',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/page.tsx:27',message:'CLIENT - Error caught',data:{errorMessage:err.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       setError(err.message)
     } finally {
       setLoading(false)
