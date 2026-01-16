@@ -28,6 +28,17 @@ export async function GET(request: Request) {
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
+  console.log('[LinkedIn OAuth DEBUG] Callback received')
+  console.log('[LinkedIn OAuth DEBUG] Full URL:', request.url)
+  console.log('[LinkedIn OAuth DEBUG] Search params:', {
+    hasCode: !!code,
+    hasState: !!state,
+    hasError: !!error,
+    error,
+    errorDescription,
+    allParams: Array.from(searchParams.entries())
+  })
+
   // Handle user denial
   if (error) {
     console.error('[LinkedIn OAuth] User denied:', error, errorDescription)
@@ -38,6 +49,7 @@ export async function GET(request: Request) {
 
   // Validate required parameters
   if (!code || !state) {
+    console.error('[LinkedIn OAuth DEBUG] Missing required parameters:', { code: !!code, state: !!state })
     return NextResponse.redirect(
       new URL('/accounts?error=Invalid OAuth callback parameters', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
     )
