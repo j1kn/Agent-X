@@ -80,9 +80,6 @@ export async function publishScheduledPosts(): Promise<{
 
       console.log(`[Publisher] Publishing post ${postId} to ${platform}`)
 
-      // STEP 2.2: Route to platform-specific publisher using standardized PublishArgs
-      let result
-
       // Build standardized arguments object
       const publishArgs: PublishArgs = {
         accessToken: account.access_token,
