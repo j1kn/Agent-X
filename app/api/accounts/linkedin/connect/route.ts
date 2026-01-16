@@ -54,9 +54,11 @@ export async function GET() {
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('state', state)
-  authUrl.searchParams.set('scope', 'r_liteprofile r_organization_social w_organization_social')
+  // Updated to use modern LinkedIn API v2 scopes
+  authUrl.searchParams.set('scope', 'openid profile email w_member_social r_organization_admin w_organization_social')
 
   console.log('[LinkedIn OAuth] Redirecting to:', authUrl.toString())
+  console.log('[LinkedIn OAuth] Redirect URI:', redirectUri)
 
   // Redirect to LinkedIn authorization page
   return NextResponse.redirect(authUrl.toString())
