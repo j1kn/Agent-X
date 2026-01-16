@@ -257,6 +257,64 @@ export interface Database {
           last_updated?: string
         }
       }
+      schedule_config: {
+        Row: {
+          id: string
+          user_id: string
+          days_of_week: string[] | null
+          times: string[] | null
+          frequency: 'daily' | 'weekly' | 'monthly' | null
+          timezone: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          days_of_week?: string[] | null
+          times?: string[] | null
+          frequency?: 'daily' | 'weekly' | 'monthly' | null
+          timezone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          days_of_week?: string[] | null
+          times?: string[] | null
+          frequency?: 'daily' | 'weekly' | 'monthly' | null
+          timezone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      workflow_runs: {
+        Row: {
+          id: string
+          user_id: string
+          time_slot: string
+          status: 'completed' | 'failed'
+          platforms_published: string[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          time_slot: string
+          status: 'completed' | 'failed'
+          platforms_published?: string[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          time_slot?: string
+          status?: 'completed' | 'failed'
+          platforms_published?: string[]
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { days_of_week, times, frequency } = await request.json()
+  const { days_of_week, times, frequency, timezone } = await request.json()
 
   const { error } = await supabase
     .from('schedule_config')
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
       days_of_week,
       times,
       frequency,
+      timezone: timezone || 'UTC',
     }, {
       onConflict: 'user_id'
     })

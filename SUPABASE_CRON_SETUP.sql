@@ -1,5 +1,5 @@
 -- ============================================
--- Supabase Cron Setup for Post Publishing
+-- Supabase Cron Setup for Agent X
 -- ============================================
 -- This works on ALL Vercel plans (including Hobby)
 -- Replaces Vercel Cron which only works on Pro+
@@ -18,12 +18,45 @@ CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
 GRANT USAGE ON SCHEMA cron TO postgres;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
 
--- Step 3: Remove existing cron job if it exists
+-- ============================================
+-- CRON JOB 1: Workflow Runner (PRIMARY)
+-- ============================================
+-- Runs every 5 minutes to check schedules and 
+-- generate + publish posts immediately.
+-- This is the main autopilot engine.
+
+-- Remove existing cron job if it exists
+SELECT cron.unschedule('workflow-runner-cron') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'workflow-runner-cron'
+);
+
+-- Create workflow runner cron job
+-- ⚠️ REPLACE YOUR-VERCEL-DOMAIN with your actual Vercel domain!
+SELECT cron.schedule(
+  'workflow-runner-cron',
+  '*/5 * * * *',  -- Every 5 minutes
+  $$
+  SELECT net.http_post(
+    url := 'https://YOUR-VERCEL-DOMAIN.vercel.app/api/workflows/run',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json'
+    )
+  ) AS request_id;
+  $$
+);
+
+-- ============================================
+-- CRON JOB 2: Scheduled Post Publisher (LEGACY)
+-- ============================================
+-- Publishes posts that were manually scheduled
+-- for a future time. Runs every 5 minutes.
+
+-- Remove existing cron job if it exists
 SELECT cron.unschedule('publish-posts-cron') WHERE EXISTS (
   SELECT 1 FROM cron.job WHERE jobname = 'publish-posts-cron'
 );
 
--- Step 4: Create cron job to publish posts every 5 minutes
+-- Create cron job to publish scheduled posts
 -- ⚠️ REPLACE YOUR-VERCEL-DOMAIN with your actual Vercel domain!
 SELECT cron.schedule(
   'publish-posts-cron',
@@ -38,21 +71,31 @@ SELECT cron.schedule(
   $$
 );
 
--- Step 5: Verify cron job was created
+-- ============================================
+-- Verify cron jobs were created
+-- ============================================
 SELECT jobid, jobname, schedule, command 
 FROM cron.job 
-WHERE jobname = 'publish-posts-cron';
+WHERE jobname IN ('workflow-runner-cron', 'publish-posts-cron');
 
 -- ============================================
 -- To check cron job execution logs:
 -- ============================================
 -- SELECT * FROM cron.job_run_details 
--- WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'publish-posts-cron')
+-- WHERE jobid IN (SELECT jobid FROM cron.job WHERE jobname IN ('workflow-runner-cron', 'publish-posts-cron'))
 -- ORDER BY start_time DESC 
--- LIMIT 10;
+-- LIMIT 20;
 
 -- ============================================
--- To manually trigger (for testing):
+-- To manually trigger workflow runner (for testing):
+-- ============================================
+-- SELECT net.http_post(
+--   url := 'https://YOUR-VERCEL-DOMAIN.vercel.app/api/workflows/run',
+--   headers := jsonb_build_object('Content-Type', 'application/json')
+-- );
+
+-- ============================================
+-- To manually trigger publish cron (for testing):
 -- ============================================
 -- SELECT net.http_post(
 --   url := 'https://YOUR-VERCEL-DOMAIN.vercel.app/api/cron/publish',
@@ -62,5 +105,6 @@ WHERE jobname = 'publish-posts-cron';
 -- ============================================
 -- To unschedule (if needed):
 -- ============================================
+-- SELECT cron.unschedule('workflow-runner-cron');
 -- SELECT cron.unschedule('publish-posts-cron');
 
