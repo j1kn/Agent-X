@@ -96,7 +96,6 @@ export async function GET(request: Request) {
     console.log('💾 Saving to database...')
     const { error: dbError } = await supabase
       .from('connected_accounts')
-      // @ts-expect-error - Supabase type inference issue with upsert
       .upsert({
         user_id: userId,
         platform: 'x',

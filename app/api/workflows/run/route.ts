@@ -20,9 +20,20 @@ import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
 import type { PublishArgs } from '@/lib/pipeline/types'
+import type { Database, Json } from '@/types/database'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
+
+// Types derived from Database for type safety
+type PostInsert = Database['public']['Tables']['posts']['Insert']
+type WorkflowRunInsert = Database['public']['Tables']['workflow_runs']['Insert']
+type PipelineLogInsert = Database['public']['Tables']['pipeline_logs']['Insert']
+type Platform = Database['public']['Tables']['posts']['Row']['platform']
+type PostStatus = Database['public']['Tables']['posts']['Row']['status']
+type WorkflowStatus = Database['public']['Tables']['workflow_runs']['Row']['status']
+type PipelineStep = Database['public']['Tables']['pipeline_logs']['Row']['step']
+type PipelineStatus = Database['public']['Tables']['pipeline_logs']['Row']['status']
 
 // Types for database queries
 type UserProfile = {
@@ -40,7 +51,7 @@ type ScheduleConfig = {
 
 type ConnectedAccount = {
   id: string
-  platform: 'x' | 'telegram' | 'linkedin'
+  platform: Platform
   access_token: string
   platform_user_id: string
   username: string
@@ -211,20 +222,19 @@ export async function POST() {
             }
             
             // Save published post record
-            await supabase
-              .from('posts')
-              .insert({
-                user_id: user.id,
-                account_id: account.id,
-                status: 'published',
-                content,
-                platform,
-                published_at: new Date().toISOString(),
-                platform_post_id: publishResult.postId,
-                generation_prompt: prompt,
-                generation_model: model,
-                topic,
-              })
+            const publishedPost: PostInsert = {
+              user_id: user.id,
+              account_id: account.id,
+              status: 'published' satisfies PostStatus,
+              content,
+              platform,
+              published_at: new Date().toISOString(),
+              platform_post_id: publishResult.postId,
+              generation_prompt: prompt,
+              generation_model: model,
+              topic,
+            }
+            await supabase.from('posts').insert(publishedPost)
             
             console.log(`✓ Published to ${platform} (ID: ${publishResult.postId})`)
             await logPipeline(supabase, user.id, 'publishing', 'success', `Published to ${platform}`, {
@@ -240,31 +250,29 @@ export async function POST() {
               `Failed to publish to ${platform}: ${publishError instanceof Error ? publishError.message : 'Unknown'}`)
             
             // Save failed post record
-            await supabase
-              .from('posts')
-              .insert({
-                user_id: user.id,
-                account_id: account.id,
-                status: 'failed',
-                content,
-                platform,
-                generation_prompt: prompt,
-                generation_model: model,
-                topic,
-              })
+            const failedPost: PostInsert = {
+              user_id: user.id,
+              account_id: account.id,
+              status: 'failed' satisfies PostStatus,
+              content,
+              platform,
+              generation_prompt: prompt,
+              generation_model: model,
+              topic,
+            }
+            await supabase.from('posts').insert(failedPost)
           }
         }
         
         // Record workflow run (for idempotency)
-        const runStatus = platformsPublished.length > 0 ? 'completed' : 'failed'
-        await supabase
-          .from('workflow_runs')
-          .insert({
-            user_id: user.id,
-            time_slot: timeSlot,
-            status: runStatus,
-            platforms_published: platformsPublished,
-          })
+        const runStatus: WorkflowStatus = platformsPublished.length > 0 ? 'completed' : 'failed'
+        const workflowRun: WorkflowRunInsert = {
+          user_id: user.id,
+          time_slot: timeSlot,
+          status: runStatus,
+          platforms_published: platformsPublished,
+        }
+        await supabase.from('workflow_runs').insert(workflowRun)
         
         results.push({
           userId: user.id,
@@ -383,18 +391,17 @@ function checkTimeMatch(schedule: ScheduleConfig): {
 async function logPipeline(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string,
-  step: string,
-  status: string,
+  step: PipelineStep,
+  status: PipelineStatus,
   message: string,
-  metadata?: Record<string, unknown>
+  metadata?: Json
 ) {
-  await supabase
-    .from('pipeline_logs')
-    .insert({
-      user_id: userId,
-      step,
-      status,
-      message,
-      metadata: metadata || {},
-    })
+  const logEntry: PipelineLogInsert = {
+    user_id: userId,
+    step,
+    status,
+    message,
+    metadata: metadata ?? {},
+  }
+  await supabase.from('pipeline_logs').insert(logEntry)
 }

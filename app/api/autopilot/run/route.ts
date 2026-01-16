@@ -186,7 +186,6 @@ export async function POST(request: Request) {
               if (!publishResult.success && publishResult.error?.includes('expired')) {
                 await supabase
                   .from('connected_accounts')
-                  // @ts-expect-error - Supabase update type inference issue
                   .update({ is_active: false })
                   .eq('id', account.id)
                 console.warn(`Marked LinkedIn account ${account.id} as inactive due to expired token`)
@@ -202,7 +201,6 @@ export async function POST(request: Request) {
             // Save post record
             const { error: postError } = await supabase
               .from('posts')
-              // @ts-expect-error - Supabase insert type inference issue
               .insert({
                 user_id: user.id,
                 account_id: account.id,
@@ -232,7 +230,6 @@ export async function POST(request: Request) {
             // Save failed post record
             await supabase
               .from('posts')
-              // @ts-expect-error - Supabase insert type inference issue
               .insert({
                 user_id: user.id,
                 account_id: account.id,

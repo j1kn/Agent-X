@@ -50,13 +50,9 @@ export async function publishScheduledPosts(): Promise<{
   // STEP 2: Process each post with row locking
   for (const post of posts) {
     try {
-      // @ts-expect-error - Post type inference issue
       const postId = post.id
-      // @ts-expect-error - Post type inference issue
       const userId = post.user_id
-      // @ts-expect-error - Post type inference issue
       const content = post.content
-      // @ts-expect-error - Post type inference issue
       const account = post.connected_accounts as any
 
       if (!account) {
@@ -68,7 +64,6 @@ export async function publishScheduledPosts(): Promise<{
       // STEP 2.1: Lock row by updating status to 'publishing' (prevents duplicate execution)
       const { error: lockError } = await supabase
         .from('posts')
-        // @ts-expect-error - Supabase type inference issue
         .update({ status: 'publishing' })
         .eq('id', postId)
         .eq('status', 'scheduled') // Only update if still scheduled (atomic lock)
@@ -123,7 +118,6 @@ export async function publishScheduledPosts(): Promise<{
         // Update post status to 'published'
         await supabase
           .from('posts')
-          // @ts-expect-error - Supabase type inference issue
           .update({
             status: 'published',
             published_at: new Date().toISOString(),
@@ -154,18 +148,14 @@ export async function publishScheduledPosts(): Promise<{
       // STEP 2.4: Handle failure
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       
-      // @ts-expect-error - Post type inference issue
       const postId = post.id
-      // @ts-expect-error - Post type inference issue
       const userId = post.user_id
-      // @ts-expect-error - Post type inference issue
       const account = post.connected_accounts as any
       const platform = account?.platform || 'unknown'
 
       // Update post status to 'failed'
       await supabase
         .from('posts')
-        // @ts-expect-error - Supabase type inference issue
         .update({
           status: 'failed',
           updated_at: new Date().toISOString(),

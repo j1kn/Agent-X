@@ -17,6 +17,9 @@ export interface Database {
           topics: string[]
           tone: string | null
           posting_frequency: 'daily' | 'twice_daily' | 'weekly' | null
+          default_model: string | null
+          training_instructions: string | null
+          autopilot_enabled: boolean | null
           created_at: string
           updated_at: string
         }
@@ -27,6 +30,9 @@ export interface Database {
           topics?: string[]
           tone?: string | null
           posting_frequency?: 'daily' | 'twice_daily' | 'weekly' | null
+          default_model?: string | null
+          training_instructions?: string | null
+          autopilot_enabled?: boolean | null
           created_at?: string
           updated_at?: string
         }
@@ -37,9 +43,13 @@ export interface Database {
           topics?: string[]
           tone?: string | null
           posting_frequency?: 'daily' | 'twice_daily' | 'weekly' | null
+          default_model?: string | null
+          training_instructions?: string | null
+          autopilot_enabled?: boolean | null
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       connected_accounts: {
         Row: {
@@ -81,6 +91,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'connected_accounts_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
       }
       posts: {
         Row: {
@@ -97,6 +116,7 @@ export interface Database {
           generation_model: string | null
           generation_metadata: Json
           post_format: string | null
+          topic: string | null
           created_at: string
           updated_at: string
         }
@@ -114,6 +134,7 @@ export interface Database {
           generation_model?: string | null
           generation_metadata?: Json
           post_format?: string | null
+          topic?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -131,9 +152,26 @@ export interface Database {
           generation_model?: string | null
           generation_metadata?: Json
           post_format?: string | null
+          topic?: string | null
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'posts_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'posts_account_id_fkey'
+            columns: ['account_id']
+            isOneToOne: false
+            referencedRelation: 'connected_accounts'
+            referencedColumns: ['id']
+          }
+        ]
       }
       post_metrics: {
         Row: {
@@ -169,6 +207,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'post_metrics_post_id_fkey'
+            columns: ['post_id']
+            isOneToOne: false
+            referencedRelation: 'posts'
+            referencedColumns: ['id']
+          }
+        ]
       }
       pipeline_logs: {
         Row: {
@@ -198,6 +245,15 @@ export interface Database {
           metadata?: Json
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'pipeline_logs_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
       }
       oauth_pkce_storage: {
         Row: {
@@ -221,6 +277,15 @@ export interface Database {
           user_id?: string
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'oauth_pkce_storage_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
       }
       learning_data: {
         Row: {
@@ -256,6 +321,22 @@ export interface Database {
           sample_size?: number
           last_updated?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'learning_data_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_data_account_id_fkey'
+            columns: ['account_id']
+            isOneToOne: false
+            referencedRelation: 'connected_accounts'
+            referencedColumns: ['id']
+          }
+        ]
       }
       schedule_config: {
         Row: {
@@ -288,6 +369,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'schedule_config_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: true
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
       }
       workflow_runs: {
         Row: {
@@ -314,6 +404,15 @@ export interface Database {
           platforms_published?: string[]
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'workflow_runs_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
       }
     }
     Views: {
@@ -325,6 +424,8 @@ export interface Database {
     Enums: {
       [_ in never]: never
     }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
-
