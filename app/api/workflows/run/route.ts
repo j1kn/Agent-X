@@ -1,10 +1,10 @@
 /**
  * Workflow Runner - Automatic Post Generation & Publishing
- * 
+ *
  * Called by Supabase cron every 5 minutes.
  * Checks if current time matches any user's scheduled posting time,
  * generates content, and publishes immediately to X + Telegram.
- * 
+ *
  * Key features:
  * - Respects user timezone
  * - Idempotent (uses workflow_runs table to prevent duplicates)
@@ -14,7 +14,8 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { selectNextTopic, extractRecentTopics } from '@/lib/autopilot/topicSelector'
+import { selectNextTopic } from '@/lib/autopilot/topicSelector'
+import { checkTimeMatch, logPipeline, extractRecentTopics, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
 import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
@@ -43,11 +44,6 @@ type UserProfile = {
   autopilot_enabled: boolean | null
 }
 
-type ScheduleConfig = {
-  days_of_week: string[] | null
-  times: string[] | null
-  timezone: string | null
-}
 
 type ConnectedAccount = {
   id: string
@@ -311,97 +307,4 @@ export async function POST() {
 // Also support GET for easy testing
 export async function GET() {
   return POST()
-}
-
-/**
- * Check if current time matches any scheduled time within a 5-minute window
- */
-function checkTimeMatch(schedule: ScheduleConfig): {
-  matches: boolean
-  matchedTime?: string
-  timeSlot: string
-  currentTime: string
-} {
-  const timezone = schedule.timezone || 'UTC'
-  const now = new Date()
-  
-  // Convert to user's timezone
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    weekday: 'long',
-  })
-  
-  const parts = formatter.formatToParts(now)
-  const getPart = (type: string) => parts.find(p => p.type === type)?.value || ''
-  
-  const year = getPart('year')
-  const month = getPart('month')
-  const day = getPart('day')
-  const hour = parseInt(getPart('hour'), 10)
-  const minute = parseInt(getPart('minute'), 10)
-  const weekday = getPart('weekday').toLowerCase()
-  
-  const currentTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-  const currentTotalMinutes = hour * 60 + minute
-  
-  // Check if today is in schedule (if days_of_week is specified)
-  if (schedule.days_of_week && schedule.days_of_week.length > 0) {
-    if (!schedule.days_of_week.includes(weekday)) {
-      return {
-        matches: false,
-        timeSlot: `${year}-${month}-${day} ${currentTime}`,
-        currentTime,
-      }
-    }
-  }
-  
-  // Check each scheduled time
-  for (const timeStr of schedule.times || []) {
-    const [schedHour, schedMinute] = timeStr.split(':').map(Number)
-    const schedTotalMinutes = schedHour * 60 + schedMinute
-    
-    // Check if within 5-minute window (0 to +4 minutes after scheduled time)
-    const diff = currentTotalMinutes - schedTotalMinutes
-    if (diff >= 0 && diff < 5) {
-      return {
-        matches: true,
-        matchedTime: timeStr,
-        timeSlot: `${year}-${month}-${day} ${timeStr}`,
-        currentTime,
-      }
-    }
-  }
-  
-  return {
-    matches: false,
-    timeSlot: `${year}-${month}-${day} ${currentTime}`,
-    currentTime,
-  }
-}
-
-/**
- * Log pipeline step to database
- */
-async function logPipeline(
-  supabase: ReturnType<typeof createServiceClient>,
-  userId: string,
-  step: PipelineStep,
-  status: PipelineStatus,
-  message: string,
-  metadata?: Json
-) {
-  const logEntry: PipelineLogInsert = {
-    user_id: userId,
-    step,
-    status,
-    message,
-    metadata: metadata ?? {},
-  }
-  await supabase.from('pipeline_logs').insert(logEntry)
 }

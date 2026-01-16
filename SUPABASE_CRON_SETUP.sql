@@ -19,11 +19,12 @@ GRANT USAGE ON SCHEMA cron TO postgres;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
 
 -- ============================================
--- CRON JOB 1: Workflow Runner (PRIMARY)
+-- CRON JOB 1: Workflow Runner (AUTOPILOT)
 -- ============================================
--- Runs every 5 minutes to check schedules and 
+-- Runs every 5 minutes to check schedules and
 -- generate + publish posts immediately.
--- This is the main autopilot engine.
+-- This is the main autopilot engine for scheduled auto-generation.
+-- Only processes users with autopilot_enabled = true.
 
 -- Remove existing cron job if it exists
 SELECT cron.unschedule('workflow-runner-cron') WHERE EXISTS (
@@ -46,10 +47,20 @@ SELECT cron.schedule(
 );
 
 -- ============================================
--- CRON JOB 2: Scheduled Post Publisher (LEGACY)
+-- CRON JOB 2: Scheduled Post Publisher (ENHANCED)
 -- ============================================
--- Publishes posts that were manually scheduled
--- for a future time. Runs every 5 minutes.
+-- Phase 1: Publishes posts that were manually scheduled for a future time
+-- Phase 2: If no scheduled posts exist, auto-generates content for autopilot users
+--
+-- This provides a fallback auto-generation mechanism that works alongside
+-- the workflow runner. Runs every 5 minutes.
+--
+-- NEW BEHAVIOR (as of 2026-01-16):
+-- - First publishes any scheduled posts (existing functionality)
+-- - If NO scheduled posts found, checks for autopilot users
+-- - Auto-generates and publishes content when schedule matches
+-- - Prevents duplicates via workflow_runs table
+-- - Respects autopilot_enabled flag and user schedules
 
 -- Remove existing cron job if it exists
 SELECT cron.unschedule('publish-posts-cron') WHERE EXISTS (
