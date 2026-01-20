@@ -11,6 +11,9 @@ export default function SettingsPage() {
   const [frequency, setFrequency] = useState<'daily' | 'twice_daily' | 'weekly'>('daily')
   const [success, setSuccess] = useState(false)
   const [isAiConnected, setIsAiConnected] = useState(false)
+  const [isGeminiConnected, setIsGeminiConnected] = useState(false)
+  const [geminiApiKey, setGeminiApiKey] = useState('')
+  const [showGeminiKey, setShowGeminiKey] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -25,9 +28,14 @@ export default function SettingsPage() {
         setTopics(data.profile.topics || [])
         setTone(data.profile.tone || '')
         setFrequency(data.profile.posting_frequency || 'daily')
+        // Don't set the actual key, just show if it exists
+        if (data.profile.gemini_api_key) {
+          setGeminiApiKey('') // Keep empty, user can update if needed
+        }
       }
       
       setIsAiConnected(data.isAiConnected || false)
+      setIsGeminiConnected(data.isGeminiConnected || false)
     } catch (error) {
       console.error('Failed to fetch settings:', error)
     } finally {
@@ -45,6 +53,7 @@ export default function SettingsPage() {
         topics,
         tone,
         posting_frequency: frequency,
+        gemini_api_key: geminiApiKey || null,
       }
 
       const response = await fetch('/api/settings', {
@@ -117,6 +126,79 @@ export default function SettingsPage() {
                 Ready
               </span>
             )}
+          </div>
+        </div>
+
+        {/* Gemini Image Generation */}
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border-2 border-purple-200 dark:border-purple-800">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <span className="text-white text-xl">🎨</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Gemini Image Generation
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Add AI-generated images to your posts
+                </p>
+              </div>
+            </div>
+            {isGeminiConnected && (
+              <span className="px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100">
+                Connected
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Gemini API Key
+              </label>
+              <div className="flex space-x-2">
+                <div className="flex-1 relative">
+                  <input
+                    type={showGeminiKey ? 'text' : 'password'}
+                    value={geminiApiKey}
+                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm text-gray-900 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    placeholder={isGeminiConnected ? '••••••••••••••••' : 'Enter your Gemini API key'}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGeminiKey(!showGeminiKey)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  {showGeminiKey ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Get your API key from{' '}
+                <a
+                  href="https://makersuite.google.com/app/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-600 hover:text-purple-500 dark:text-purple-400"
+                >
+                  Google AI Studio
+                </a>
+              </p>
+            </div>
+
+            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-md p-4">
+              <h3 className="text-sm font-medium text-purple-800 dark:text-purple-200 mb-2">
+                ✨ How Image Generation Works
+              </h3>
+              <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1 list-disc list-inside">
+                <li>Configure image times in the Schedule page</li>
+                <li>Gemini creates image prompts based on your post content</li>
+                <li>Images are automatically generated and attached to posts</li>
+                <li>Works with all connected platforms (X, Telegram, LinkedIn)</li>
+              </ul>
+            </div>
           </div>
         </div>
 

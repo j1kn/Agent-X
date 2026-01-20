@@ -19,6 +19,8 @@ export default function SchedulePage() {
   const [times, setTimes] = useState<string[]>(['09:00'])
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily')
   const [success, setSuccess] = useState(false)
+  const [imageGenerationEnabled, setImageGenerationEnabled] = useState(false)
+  const [imageTimes, setImageTimes] = useState<string[]>([])
 
   useEffect(() => {
     fetchSchedule()
@@ -33,6 +35,8 @@ export default function SchedulePage() {
         setSelectedDays(data.schedule.days_of_week || [])
         setTimes(data.schedule.times || ['09:00'])
         setFrequency(data.schedule.frequency || 'daily')
+        setImageGenerationEnabled(data.schedule.image_generation_enabled || false)
+        setImageTimes(data.schedule.image_times || [])
       }
     } catch (error) {
       console.error('Failed to fetch schedule:', error)
@@ -56,6 +60,8 @@ export default function SchedulePage() {
           days_of_week: selectedDays,
           times,
           frequency,
+          image_generation_enabled: imageGenerationEnabled,
+          image_times: imageTimes,
         }),
       })
 
@@ -94,6 +100,26 @@ export default function SchedulePage() {
   const removeTime = (index: number) => {
     if (times.length > 1) {
       setTimes(times.filter((_, i) => i !== index))
+    }
+  }
+
+  const addImageTime = (time: string) => {
+    if (!imageTimes.includes(time)) {
+      setImageTimes([...imageTimes, time])
+    }
+  }
+
+  const removeImageTime = (time: string) => {
+    setImageTimes(imageTimes.filter(t => t !== time))
+  }
+
+  const toggleImageTimeForAll = () => {
+    if (imageTimes.length === times.length) {
+      // If all times have images, clear them
+      setImageTimes([])
+    } else {
+      // Add all posting times as image times
+      setImageTimes([...times])
     }
   }
 
@@ -228,6 +254,100 @@ export default function SchedulePage() {
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             Times are in your local timezone. Agent X will post at these times on selected days.
           </p>
+        </div>
+
+        {/* Image Generation Settings */}
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border-2 border-purple-200 dark:border-purple-800">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <span className="text-white text-xl">🎨</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Image Generation with Gemini
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Automatically add AI-generated images to posts
+                </p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={imageGenerationEnabled}
+                onChange={(e) => setImageGenerationEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+
+          {imageGenerationEnabled && (
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Select times to include images
+                  </label>
+                  <button
+                    type="button"
+                    onClick={toggleImageTimeForAll}
+                    className="text-sm text-purple-600 hover:text-purple-500 dark:text-purple-400"
+                  >
+                    {imageTimes.length === times.length ? 'Clear all' : 'Select all times'}
+                  </button>
+                </div>
+                
+                <div className="space-y-2">
+                  {times.map((time) => (
+                    <label key={time} className="flex items-center space-x-3 p-3 rounded-md hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={imageTimes.includes(time)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            addImageTime(time)
+                          } else {
+                            removeImageTime(time)
+                          }
+                        }}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Posts at <strong>{time}</strong> will include AI-generated images
+                      </span>
+                    </label>
+                  ))}
+                  {times.length === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Add posting times above to configure image generation
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-md p-4">
+                <h3 className="text-sm font-medium text-purple-800 dark:text-purple-200 mb-2">
+                  💡 Image Generation Tips
+                </h3>
+                <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1 list-disc list-inside">
+                  <li>Configure your Gemini API key in Settings first</li>
+                  <li>Images are generated based on your post content</li>
+                  <li>Not all posts need images - select specific times</li>
+                  <li>Image generation may add a few seconds to posting time</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {!imageGenerationEnabled && (
+            <div className="text-center py-6">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Enable image generation to automatically add AI-generated images to your posts
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">

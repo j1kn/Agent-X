@@ -20,6 +20,7 @@ export interface Database {
           default_model: string | null
           training_instructions: string | null
           autopilot_enabled: boolean | null
+          gemini_api_key: string | null
           created_at: string
           updated_at: string
         }
@@ -33,6 +34,7 @@ export interface Database {
           default_model?: string | null
           training_instructions?: string | null
           autopilot_enabled?: boolean | null
+          gemini_api_key?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -46,6 +48,7 @@ export interface Database {
           default_model?: string | null
           training_instructions?: string | null
           autopilot_enabled?: boolean | null
+          gemini_api_key?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -346,6 +349,8 @@ export interface Database {
           times: string[] | null
           frequency: 'daily' | 'weekly' | 'monthly' | null
           timezone: string | null
+          image_generation_enabled: boolean | null
+          image_times: string[] | null
           created_at: string
           updated_at: string
         }
@@ -356,6 +361,8 @@ export interface Database {
           times?: string[] | null
           frequency?: 'daily' | 'weekly' | 'monthly' | null
           timezone?: string | null
+          image_generation_enabled?: boolean | null
+          image_times?: string[] | null
           created_at?: string
           updated_at?: string
         }
@@ -366,6 +373,8 @@ export interface Database {
           times?: string[] | null
           frequency?: 'daily' | 'weekly' | 'monthly' | null
           timezone?: string | null
+          image_generation_enabled?: boolean | null
+          image_times?: string[] | null
           created_at?: string
           updated_at?: string
         }

@@ -16,6 +16,8 @@ export type ScheduleConfig = {
   days_of_week: string[] | null
   times: string[] | null
   timezone: string | null
+  image_generation_enabled?: boolean | null
+  image_times?: string[] | null
 }
 
 // Time match result type
@@ -135,4 +137,34 @@ export function extractRecentTopics(posts: Array<{ topic: string | null }>): str
   return posts
     .map(p => p.topic)
     .filter((topic): topic is string => topic !== null && topic.trim() !== '')
+}
+
+/**
+ * Check if image generation should be enabled for the current time slot
+ *
+ * @param schedule - User's schedule configuration
+ * @param matchedTime - The matched time from checkTimeMatch
+ * @returns boolean indicating if image should be generated
+ */
+export function shouldGenerateImageForTime(
+  schedule: ScheduleConfig,
+  matchedTime?: string
+): boolean {
+  // Check if image generation is enabled globally
+  if (!schedule.image_generation_enabled) {
+    return false
+  }
+
+  // If no specific times are configured, don't generate images
+  if (!schedule.image_times || schedule.image_times.length === 0) {
+    return false
+  }
+
+  // If no matched time provided, can't determine
+  if (!matchedTime) {
+    return false
+  }
+
+  // Check if the matched time is in the image_times array
+  return schedule.image_times.includes(matchedTime)
 }

@@ -4,6 +4,7 @@ import { validatePostContent } from '@/lib/utils/validation'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
 import { getNextScheduledAt, type ScheduleConfig } from '@/lib/scheduling/smart-scheduler'
 import { Platform } from '@/lib/types/platform'
+import { createImagePromptWithGemini } from '@/lib/ai/providers/gemini-image'
 
 // Strict type for connected account from DB
 type ConnectedAccount = {
@@ -16,11 +17,13 @@ export interface MultiPlatformPost {
   platform: Platform
   content: string
   scheduledFor: Date
+  imagePrompt?: string
 }
 
 export interface GenerationResult {
   masterContent: string
   posts: MultiPlatformPost[]
+  imagePrompt?: string
 }
 
 /**
@@ -29,19 +32,22 @@ export interface GenerationResult {
  */
 export async function generatePost(
   userId: string,
-  topic: string
+  topic: string,
+  options?: { shouldGenerateImage?: boolean; currentTime?: string }
 ): Promise<GenerationResult> {
   const supabase = await createClient()
 
-  // 1. Get user profile for tone
+  // 1. Get user profile for tone and Gemini API key
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('tone')
+    .select('tone, gemini_api_key')
     .eq('id', userId)
     .single()
 
   // @ts-expect-error - Profile type inference issue
   const tone = profile?.tone || 'professional'
+  // @ts-expect-error - Profile type inference issue
+  const geminiApiKey = profile?.gemini_api_key
 
   // 2. Get recent posts for context (any platform)
   const { data: recentPosts } = await supabase
@@ -74,6 +80,21 @@ export async function generatePost(
 
   // 6. Calculate next scheduled time (smart scheduling)
   const scheduledTime = getNextScheduledAt(scheduleConfig)
+
+  // 6.5. Check if we should generate an image for this time slot
+  let imagePrompt: string | undefined
+  const shouldGenerateImage = options?.shouldGenerateImage ?? false
+  
+  if (shouldGenerateImage && geminiApiKey) {
+    try {
+      console.log('[Generator] Generating image prompt with Gemini...')
+      imagePrompt = await createImagePromptWithGemini(masterContent, geminiApiKey)
+      console.log('[Generator] Image prompt created:', imagePrompt)
+    } catch (error) {
+      console.error('[Generator] Failed to create image prompt:', error)
+      // Continue without image if generation fails
+    }
+  }
 
   // 7. Get connected accounts for X and Telegram
   const { data: accountsData, error: accountsError } = await supabase
@@ -121,7 +142,11 @@ export async function generatePost(
         scheduled_for: scheduledTime.toISOString(),
         generation_prompt: prompt,
         generation_model: model,
-        generation_metadata: { master_content: masterContent },
+        generation_metadata: {
+          master_content: masterContent,
+          image_prompt: imagePrompt || null,
+          image_generation_enabled: shouldGenerateImage
+        },
         post_format: 'social',
       })
       .select()
@@ -139,6 +164,7 @@ export async function generatePost(
       // @ts-expect-error - Post type inference issue
       content: post.content,
       scheduledFor: scheduledTime,
+      imagePrompt,
     })
   }
 
@@ -149,6 +175,7 @@ export async function generatePost(
   return {
     masterContent,
     posts,
+    imagePrompt,
   }
 }
 

@@ -15,11 +15,12 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { selectNextTopic } from '@/lib/autopilot/topicSelector'
-import { checkTimeMatch, logPipeline, extractRecentTopics, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
+import { checkTimeMatch, logPipeline, extractRecentTopics, shouldGenerateImageForTime, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
 import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
+import { createImagePromptWithGemini } from '@/lib/ai/providers/gemini-image'
 import type { PublishArgs } from '@/lib/pipeline/types'
 import type { Database, Json } from '@/types/database'
 
@@ -42,6 +43,7 @@ type UserProfile = {
   topics: string[] | null
   tone: string | null
   autopilot_enabled: boolean | null
+  gemini_api_key: string | null
 }
 
 
@@ -70,7 +72,7 @@ export async function POST() {
     // Step 1: Get all users with autopilot enabled
     const { data: users, error: usersError } = await supabase
       .from('user_profiles')
-      .select('id, topics, tone, autopilot_enabled')
+      .select('id, topics, tone, autopilot_enabled, gemini_api_key')
       .eq('autopilot_enabled', true)
     
     if (usersError) {
@@ -93,7 +95,7 @@ export async function POST() {
         // Get user's schedule configuration
         const { data: scheduleData } = await supabase
           .from('schedule_config')
-          .select('days_of_week, times, timezone')
+          .select('days_of_week, times, timezone, image_generation_enabled, image_times')
           .eq('user_id', user.id)
           .single()
         
@@ -169,6 +171,10 @@ export async function POST() {
         
         await logPipeline(supabase, user.id, 'planning', 'success', `Topic selected: ${topic}`, { topic, reason })
         
+        // Check if we should generate an image for this time slot
+        const shouldGenerateImage = shouldGenerateImageForTime(schedule, matchResult.matchedTime)
+        console.log(`Image generation: ${shouldGenerateImage ? 'ENABLED' : 'DISABLED'} for time ${matchResult.matchedTime}`)
+        
         // Generate content
         console.log('Generating content...')
         const { content: masterContent, prompt, model } = await generateContent(user.id, {
@@ -179,6 +185,21 @@ export async function POST() {
         
         console.log(`✓ Content generated (${masterContent.length} chars)`)
         await logPipeline(supabase, user.id, 'generation', 'success', 'Content generated', { model, contentLength: masterContent.length })
+        
+        // Generate image prompt if enabled
+        let imagePrompt: string | undefined
+        if (shouldGenerateImage && user.gemini_api_key) {
+          try {
+            console.log('Generating image prompt with Gemini...')
+            imagePrompt = await createImagePromptWithGemini(masterContent, user.gemini_api_key)
+            console.log(`✓ Image prompt created: ${imagePrompt.substring(0, 100)}...`)
+            await logPipeline(supabase, user.id, 'generation', 'success', 'Image prompt generated', { imagePrompt })
+          } catch (imageError) {
+            console.error('Failed to generate image prompt:', imageError)
+            await logPipeline(supabase, user.id, 'generation', 'warning',
+              `Image prompt generation failed: ${imageError instanceof Error ? imageError.message : 'Unknown'}`)
+          }
+        }
         
         // Create platform variants
         const variants = createPlatformVariants(masterContent)
@@ -228,6 +249,11 @@ export async function POST() {
               platform_post_id: publishResult.postId,
               generation_prompt: prompt,
               generation_model: model,
+              generation_metadata: {
+                master_content: masterContent,
+                image_prompt: imagePrompt || null,
+                image_generation_enabled: shouldGenerateImage
+              },
               topic,
             }
             await supabase.from('posts').insert(publishedPost)
@@ -254,6 +280,11 @@ export async function POST() {
               platform,
               generation_prompt: prompt,
               generation_model: model,
+              generation_metadata: {
+                master_content: masterContent,
+                image_prompt: imagePrompt || null,
+                image_generation_enabled: shouldGenerateImage
+              },
               topic,
             }
             await supabase.from('posts').insert(failedPost)
