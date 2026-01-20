@@ -120,6 +120,8 @@ export interface Database {
           generation_metadata: Json
           post_format: string | null
           topic: string | null
+          image_url: string | null
+          image_data: string | null
           created_at: string
           updated_at: string
         }
@@ -138,6 +140,8 @@ export interface Database {
           generation_metadata?: Json
           post_format?: string | null
           topic?: string | null
+          image_url?: string | null
+          image_data?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -156,6 +160,8 @@ export interface Database {
           generation_metadata?: Json
           post_format?: string | null
           topic?: string | null
+          image_url?: string | null
+          image_data?: string | null
           created_at?: string
           updated_at?: string
         }

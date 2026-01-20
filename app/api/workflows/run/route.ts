@@ -20,7 +20,7 @@ import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
-import { createImagePromptWithGemini } from '@/lib/ai/providers/gemini-image'
+import { generateImageWithGemini, validateImageGenerationConfig } from '@/lib/ai/providers/gemini-image'
 import type { PublishArgs } from '@/lib/pipeline/types'
 import type { Database, Json } from '@/types/database'
 
@@ -186,19 +186,64 @@ export async function POST() {
         console.log(`✓ Content generated (${masterContent.length} chars)`)
         await logPipeline(supabase, user.id, 'generation', 'success', 'Content generated', { model, contentLength: masterContent.length })
         
-        // Generate image prompt if enabled
+        // STRICT IMAGE GENERATION WORKFLOW
         let imagePrompt: string | undefined
-        if (shouldGenerateImage && user.gemini_api_key) {
-          try {
-            console.log('Generating image prompt with Gemini...')
-            imagePrompt = await createImagePromptWithGemini(masterContent, user.gemini_api_key)
-            console.log(`✓ Image prompt created: ${imagePrompt.substring(0, 100)}...`)
-            await logPipeline(supabase, user.id, 'generation', 'success', 'Image prompt generated', { imagePrompt })
-          } catch (imageError) {
-            console.error('Failed to generate image prompt:', imageError)
-            await logPipeline(supabase, user.id, 'generation', 'warning',
-              `Image prompt generation failed: ${imageError instanceof Error ? imageError.message : 'Unknown'}`)
+        let imageData: string | undefined
+        let imageUrl: string | undefined
+        
+        if (shouldGenerateImage) {
+          console.log('[Workflow] Image generation REQUIRED for this time slot')
+          
+          // Validate Gemini API key
+          const validation = validateImageGenerationConfig(user.gemini_api_key)
+          if (!validation.valid) {
+            console.error('[Workflow] Image generation validation failed:', validation.error)
+            await logPipeline(supabase, user.id, 'generation', 'error',
+              `Image generation failed: ${validation.error}`)
+          } else {
+            try {
+              console.log('[Workflow] Starting STRICT image generation workflow...')
+              console.log('[Workflow] Step 1: Claude generates post content ✓')
+              console.log('[Workflow] Step 2: Gemini creates image prompt...')
+              console.log('[Workflow] Step 3: Gemini generates actual image...')
+              
+              // Call the complete image generation workflow
+              const imageResult = await generateImageWithGemini({
+                postContent: masterContent,
+                prompt: masterContent,
+                apiKey: user.gemini_api_key!
+              })
+              
+              if (imageResult.success) {
+                imagePrompt = imageResult.imagePrompt
+                imageData = imageResult.base64Data
+                imageUrl = imageResult.imageUrl
+                
+                console.log(`[Workflow] ✓ Image generation completed!`)
+                console.log(`[Workflow]   - Prompt: ${imagePrompt?.substring(0, 80)}...`)
+                console.log(`[Workflow]   - Image data: ${imageData ? 'YES' : 'NO'}`)
+                console.log(`[Workflow]   - Image URL: ${imageUrl || 'N/A'}`)
+                
+                await logPipeline(supabase, user.id, 'generation', 'success',
+                  'Image generated successfully', {
+                    imagePrompt,
+                    hasImageData: !!imageData,
+                    hasImageUrl: !!imageUrl
+                  })
+              } else {
+                console.error('[Workflow] Image generation failed:', imageResult.error)
+                await logPipeline(supabase, user.id, 'generation', 'warning',
+                  `Image generation failed: ${imageResult.error}`)
+              }
+              
+            } catch (imageError) {
+              console.error('[Workflow] Image generation error:', imageError)
+              await logPipeline(supabase, user.id, 'generation', 'error',
+                `Image generation error: ${imageError instanceof Error ? imageError.message : 'Unknown'}`)
+            }
           }
+        } else {
+          console.log('[Workflow] Image generation NOT required for this time slot')
         }
         
         // Create platform variants
@@ -252,8 +297,11 @@ export async function POST() {
               generation_metadata: {
                 master_content: masterContent,
                 image_prompt: imagePrompt || null,
-                image_generation_enabled: shouldGenerateImage
+                image_generation_enabled: shouldGenerateImage,
+                has_image: !!(imageData || imageUrl)
               },
+              image_url: imageUrl || null,
+              image_data: imageData || null,
               topic,
             }
             await supabase.from('posts').insert(publishedPost)
@@ -283,8 +331,11 @@ export async function POST() {
               generation_metadata: {
                 master_content: masterContent,
                 image_prompt: imagePrompt || null,
-                image_generation_enabled: shouldGenerateImage
+                image_generation_enabled: shouldGenerateImage,
+                has_image: !!(imageData || imageUrl)
               },
+              image_url: imageUrl || null,
+              image_data: imageData || null,
               topic,
             }
             await supabase.from('posts').insert(failedPost)
