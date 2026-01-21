@@ -75,7 +75,7 @@ export default function PostsPage() {
           ) : (
             posts.map((post) => (
               <li key={post.id} className="px-4 py-4 sm:px-6">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
                       <span
@@ -88,6 +88,11 @@ export default function PostsPage() {
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {post.connected_accounts?.platform}
                       </span>
+                      {post.image_url && (
+                        <span className="px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-800">
+                          📷 Has Image
+                        </span>
+                      )}
                     </div>
                     {post.topic && (
                       <p className="text-xs text-indigo-600 dark:text-indigo-400 mb-1">
@@ -97,6 +102,15 @@ export default function PostsPage() {
                     <p className="text-sm text-gray-900 dark:text-white mb-2">
                       {post.content}
                     </p>
+                    {post.image_url && (
+                      <div className="mt-3 mb-3">
+                        <img
+                          src={post.image_url}
+                          alt="Post image"
+                          className="max-w-sm rounded-lg shadow-md border border-gray-200"
+                        />
+                      </div>
+                    )}
                     <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
                       {post.scheduled_for && (
                         <p>
