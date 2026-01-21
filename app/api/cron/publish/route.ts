@@ -261,7 +261,7 @@ async function autoGenerateAndPublish(): Promise<{
           hasImagePrompt: !!imagePrompt
         })
         
-        // SIMPLIFIED IMAGE GENERATION WORKFLOW
+        // IMAGE GENERATION WORKFLOW
         let imageData: string | undefined
         let imageUrl: string | undefined
         
@@ -296,11 +296,13 @@ async function autoGenerateAndPublish(): Promise<{
                 if (uploadResult.success && uploadResult.publicUrl) {
                   imageUrl = uploadResult.publicUrl
                   console.log('[Auto-Gen] ✓ Image uploaded! URL:', imageUrl)
+                  console.log('[Auto-Gen] ✓ Image will be stored in database with posts')
                   
                   await logPipeline(supabase, user.id, 'generation', 'success',
                     'Image pipeline successful', {
                       imagePrompt: imagePrompt.substring(0, 200),
                       imageUrl,
+                      imageStoragePath: uploadResult.publicUrl,
                       hasImageData: true
                     })
                 } else {
@@ -322,7 +324,7 @@ async function autoGenerateAndPublish(): Promise<{
         } else if (shouldGenerateImage && !imagePrompt) {
           console.log('[Auto-Gen] Image enabled but no prompt created')
         } else {
-          console.log('[Auto-Gen] Image generation NOT required')
+          console.log('[Auto-Gen] Image generation NOT required for this time slot')
         }
         
         // Create platform variants
