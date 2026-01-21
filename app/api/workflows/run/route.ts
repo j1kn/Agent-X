@@ -259,12 +259,27 @@ export async function POST() {
           console.log(`Publishing to ${platform} (${account.username})...`)
           
           try {
+            // Prepare media URLs if image was generated
+            const mediaUrls: string[] = []
+            if (imageUrl) {
+              mediaUrls.push(imageUrl)
+              console.log(`[Workflow] Including image URL in post: ${imageUrl}`)
+            } else if (imageData) {
+              // Image data exists but needs to be uploaded to get a URL
+              // For now, log that we have image data
+              console.log(`[Workflow] Image data available (${imageData.length} chars) but no URL yet`)
+              console.log(`[Workflow] TODO: Upload base64 image to Supabase Storage to get URL`)
+            }
+            
             const publishArgs: PublishArgs = {
               accessToken: account.access_token,
               platformUserId: account.platform_user_id || account.username,
               content,
+              mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
               tokenExpiresAt: account.token_expires_at || null,
             }
+            
+            console.log(`[Workflow] Publishing with ${mediaUrls.length} media attachment(s)`)
             
             let publishResult
             
