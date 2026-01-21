@@ -111,9 +111,7 @@ async function testCronImageGeneration() {
   console.log('Recent Posts:')
   if (recentPosts && recentPosts.length > 0) {
     recentPosts.forEach((post, i) => {
-      // @ts-expect-error - Type inference issue
       const hasImage = !!(post.image_url || post.image_data)
-      // @ts-expect-error - Type inference issue
       const metadata = post.generation_metadata as any
       console.log(`  ${i + 1}. ${post.created_at}`)
       console.log(`     Platform: ${post.platform}`)
@@ -145,7 +143,6 @@ async function testCronImageGeneration() {
     logs.forEach((log, i) => {
       const icon = log.status === 'success' ? '✓' : log.status === 'error' ? '✗' : '⚠'
       console.log(`  ${i + 1}. ${icon} ${log.message}`)
-      // @ts-expect-error - Type inference issue
       const metadata = log.metadata as any
       if (metadata?.imageUrl) {
         console.log(`     Image URL: ${metadata.imageUrl}`)
