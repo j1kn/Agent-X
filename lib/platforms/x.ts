@@ -23,15 +23,20 @@ function decryptXCredentials(encryptedJson: string): XOAuth1Credentials {
 export async function publishToX(
   args: PublishArgs
 ): Promise<PublishResult> {
-  const { accessToken, content } = args
+  const { accessToken, content, mediaUrls } = args
   
   try {
     // Decrypt OAuth 1.0a credentials at runtime
     // accessToken contains the encrypted JSON credentials for X
     const credentials = decryptXCredentials(accessToken)
     
-    // Post tweet using OAuth 1.0a signing
-    const result = await postTweetOAuth1(credentials, content)
+    // Log if media is being included
+    if (mediaUrls && mediaUrls.length > 0) {
+      console.log(`[X Publisher] Publishing tweet with ${mediaUrls.length} media attachment(s)`)
+    }
+    
+    // Post tweet using OAuth 1.0a signing (with optional media)
+    const result = await postTweetOAuth1(credentials, content, mediaUrls)
 
     return {
       success: true,

@@ -8,7 +8,7 @@ export async function publishToTelegram(
   args: PublishArgs
 ): Promise<PublishResult> {
   // Extract inputs (IMMUTABLE - never reassign)
-  const { accessToken, platformUserId, content } = args
+  const { accessToken, platformUserId, content, mediaUrls } = args
   
   // Telegram requires NUMERIC chat_id (not @username)
   // chat_id must come from platform_user_id (stored as string, but must be numeric)
@@ -27,55 +27,106 @@ export async function publishToTelegram(
   const numericChatId = Number(chatId)
 
   try {
-    // Telegram Bot API - send message to channel/group
-    // Bot must be added to channel/group as administrator
-    // chat_id must be numeric (channel/group ID, not username)
-    const url = `https://api.telegram.org/bot${accessToken}/sendMessage`
-
-    const requestBody = {
-      chat_id: numericChatId, // Convert to number for Telegram API
-      text: content,
-      parse_mode: 'HTML',
-    }
-
-    console.log('[Telegram] Publishing to chat_id:', numericChatId)
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    })
-
-    const data = await response.json()
-
-    // Log FULL API response when error occurs
-    if (!response.ok || !data.ok) {
-      const errorDetails = {
-        error_code: data.error_code || 'unknown',
-        description: data.description || 'No description provided',
+    // Check if we have media to send
+    const hasMedia = mediaUrls && mediaUrls.length > 0
+    
+    if (hasMedia) {
+      console.log(`[Telegram] Publishing with ${mediaUrls.length} media attachment(s)`)
+      
+      // Use sendPhoto for posts with images
+      const url = `https://api.telegram.org/bot${accessToken}/sendPhoto`
+      
+      const requestBody = {
         chat_id: numericChatId,
-        response_status: response.status,
-        full_response: data,
+        photo: mediaUrls[0], // Telegram sendPhoto takes URL directly
+        caption: content,
+        parse_mode: 'HTML',
       }
       
-      console.error('[Telegram] API Error:', JSON.stringify(errorDetails, null, 2))
+      console.log('[Telegram] Publishing photo to chat_id:', numericChatId)
       
-      // Build descriptive error message
-      const errorMessage = `Telegram API error (code: ${errorDetails.error_code}): ${errorDetails.description}. chat_id: ${numericChatId}`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok || !data.ok) {
+        const errorDetails = {
+          error_code: data.error_code || 'unknown',
+          description: data.description || 'No description provided',
+          chat_id: numericChatId,
+          response_status: response.status,
+          full_response: data,
+        }
+        
+        console.error('[Telegram] API Error:', JSON.stringify(errorDetails, null, 2))
+        
+        const errorMessage = `Telegram API error (code: ${errorDetails.error_code}): ${errorDetails.description}. chat_id: ${numericChatId}`
+        
+        return {
+          success: false,
+          error: errorMessage,
+        }
+      }
+      
+      console.log('[Telegram] Photo published successfully:', data.result.message_id)
       
       return {
-        success: false,
-        error: errorMessage,
+        success: true,
+        postId: data.result.message_id.toString(),
       }
-    }
+    } else {
+      // No media - send text message
+      const url = `https://api.telegram.org/bot${accessToken}/sendMessage`
 
-    console.log('[Telegram] Published successfully:', data.result.message_id)
-    
-    return {
-      success: true,
-      postId: data.result.message_id.toString(),
+      const requestBody = {
+        chat_id: numericChatId,
+        text: content,
+        parse_mode: 'HTML',
+      }
+
+      console.log('[Telegram] Publishing text to chat_id:', numericChatId)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.ok) {
+        const errorDetails = {
+          error_code: data.error_code || 'unknown',
+          description: data.description || 'No description provided',
+          chat_id: numericChatId,
+          response_status: response.status,
+          full_response: data,
+        }
+        
+        console.error('[Telegram] API Error:', JSON.stringify(errorDetails, null, 2))
+        
+        const errorMessage = `Telegram API error (code: ${errorDetails.error_code}): ${errorDetails.description}. chat_id: ${numericChatId}`
+        
+        return {
+          success: false,
+          error: errorMessage,
+        }
+      }
+
+      console.log('[Telegram] Text published successfully:', data.result.message_id)
+      
+      return {
+        success: true,
+        postId: data.result.message_id.toString(),
+      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'

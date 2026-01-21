@@ -84,13 +84,86 @@ export async function validateXCredentials(
 }
 
 /**
+ * Upload media to X (Twitter) and get media_id
+ */
+async function uploadMediaToX(
+  credentials: XOAuth1Credentials,
+  imageUrl: string
+): Promise<string> {
+  const oauth = createOAuthClient(credentials.apiKey, credentials.apiSecret)
+  
+  // Download image from URL
+  const imageResponse = await fetch(imageUrl)
+  if (!imageResponse.ok) {
+    throw new Error('Failed to download image')
+  }
+  
+  const imageBuffer = await imageResponse.arrayBuffer()
+  const imageBase64 = Buffer.from(imageBuffer).toString('base64')
+  
+  // Upload media using v1.1 API (media upload endpoint)
+  const uploadRequestData = {
+    url: 'https://upload.twitter.com/1.1/media/upload.json',
+    method: 'POST',
+  }
+  
+  const token = {
+    key: credentials.accessToken,
+    secret: credentials.accessTokenSecret,
+  }
+  
+  const authHeader = oauth.toHeader(oauth.authorize(uploadRequestData, token))
+  
+  const formData = new FormData()
+  formData.append('media_data', imageBase64)
+  
+  const uploadResponse = await fetch(uploadRequestData.url, {
+    method: uploadRequestData.method,
+    headers: {
+      ...authHeader,
+    },
+    body: formData,
+  })
+  
+  if (!uploadResponse.ok) {
+    const errorText = await uploadResponse.text()
+    throw new Error(`Failed to upload media: ${errorText}`)
+  }
+  
+  const uploadData = await uploadResponse.json()
+  
+  if (!uploadData.media_id_string) {
+    throw new Error('No media_id returned from upload')
+  }
+  
+  return uploadData.media_id_string
+}
+
+/**
  * Post a tweet using OAuth 1.0a credentials
  */
 export async function postTweetOAuth1(
   credentials: XOAuth1Credentials,
-  text: string
+  text: string,
+  mediaUrls?: string[]
 ): Promise<{ id: string }> {
   const oauth = createOAuthClient(credentials.apiKey, credentials.apiSecret)
+  
+  // Upload media if provided
+  let mediaIds: string[] = []
+  if (mediaUrls && mediaUrls.length > 0) {
+    console.log('[X] Uploading media...')
+    for (const mediaUrl of mediaUrls) {
+      try {
+        const mediaId = await uploadMediaToX(credentials, mediaUrl)
+        mediaIds.push(mediaId)
+        console.log('[X] Media uploaded:', mediaId)
+      } catch (error) {
+        console.error('[X] Failed to upload media:', error)
+        // Continue without media if upload fails
+      }
+    }
+  }
   
   const requestData = {
     url: 'https://api.twitter.com/2/tweets',
@@ -104,13 +177,21 @@ export async function postTweetOAuth1(
   
   const authHeader = oauth.toHeader(oauth.authorize(requestData, token))
   
+  // Build tweet payload
+  const tweetPayload: any = { text }
+  if (mediaIds.length > 0) {
+    tweetPayload.media = {
+      media_ids: mediaIds
+    }
+  }
+  
   const response = await fetch(requestData.url, {
     method: requestData.method,
     headers: {
       ...authHeader,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(tweetPayload),
   })
   
   if (!response.ok) {
