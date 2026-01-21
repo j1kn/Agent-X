@@ -6,7 +6,9 @@ import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
-import { checkTimeMatch, logPipeline, extractRecentTopics, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
+import { checkTimeMatch, logPipeline, extractRecentTopics, shouldGenerateImageForTime, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
+import { generateImageWithStability } from '@/lib/ai/providers/stability-image'
+import { uploadImageToStorage } from '@/lib/storage/image-upload'
 import type { PublishArgs } from '@/lib/pipeline/types'
 import type { Database } from '@/types/database'
 
@@ -155,7 +157,7 @@ async function autoGenerateAndPublish(): Promise<{
         // Get user's schedule configuration
         const { data: scheduleData } = await supabase
           .from('schedule_config')
-          .select('days_of_week, times, timezone')
+          .select('days_of_week, times, timezone, image_generation_enabled, image_times')
           .eq('user_id', user.id)
           .single()
         
@@ -231,16 +233,97 @@ async function autoGenerateAndPublish(): Promise<{
         
         await logPipeline(supabase, user.id, 'planning', 'success', `Topic selected: ${topic}`, { topic, reason })
         
-        // Generate content
-        console.log('[Auto-Gen] Generating content...')
-        const { content: masterContent, prompt, model } = await generateContent(user.id, {
+        // Check if we should generate an image for this time slot
+        const shouldGenerateImage = shouldGenerateImageForTime(schedule, matchResult.matchedTime)
+        console.log(`[Auto-Gen] Image generation: ${shouldGenerateImage ? 'ENABLED' : 'DISABLED'} for time ${matchResult.matchedTime}`)
+        
+        // Generate content with Claude (and image prompt if needed)
+        console.log('[Auto-Gen] Generating content with Claude...')
+        const result = await generateContent(user.id, {
           topic,
           tone: user.tone || 'professional',
           recentPosts: recentContents,
+          generateImagePrompt: shouldGenerateImage,
         })
         
+        const masterContent = result.content
+        const prompt = result.prompt
+        const model = result.model
+        let imagePrompt = result.imagePrompt
+        
         console.log(`[Auto-Gen] ✓ Content generated (${masterContent.length} chars)`)
-        await logPipeline(supabase, user.id, 'generation', 'success', 'Content generated', { model, contentLength: masterContent.length })
+        if (imagePrompt) {
+          console.log(`[Auto-Gen] ✓ Image prompt generated (${imagePrompt.length} chars)`)
+        }
+        await logPipeline(supabase, user.id, 'generation', 'success', 'Content generated', {
+          model,
+          contentLength: masterContent.length,
+          hasImagePrompt: !!imagePrompt
+        })
+        
+        // SIMPLIFIED IMAGE GENERATION WORKFLOW
+        let imageData: string | undefined
+        let imageUrl: string | undefined
+        
+        if (shouldGenerateImage && imagePrompt) {
+          console.log('[Auto-Gen] Image generation REQUIRED for this time slot')
+          
+          const stabilityApiKey = process.env.STABILITY_API_KEY
+          
+          if (!stabilityApiKey) {
+            console.error('[Auto-Gen] STABILITY_API_KEY not configured')
+            await logPipeline(supabase, user.id, 'generation', 'error',
+              'Image generation failed: STABILITY_API_KEY not configured')
+          } else {
+            try {
+              console.log('[Auto-Gen] Generating image with Stability AI...')
+              
+              const stabilityResult = await generateImageWithStability({
+                prompt: imagePrompt,
+                apiKey: stabilityApiKey,
+              })
+              
+              if (stabilityResult.success && stabilityResult.base64Data) {
+                imageData = stabilityResult.base64Data
+                console.log('[Auto-Gen] ✓ Image generated!')
+                console.log('[Auto-Gen] Uploading to Supabase Storage...')
+                
+                const uploadResult = await uploadImageToStorage(
+                  stabilityResult.base64Data,
+                  user.id
+                )
+                
+                if (uploadResult.success && uploadResult.publicUrl) {
+                  imageUrl = uploadResult.publicUrl
+                  console.log('[Auto-Gen] ✓ Image uploaded! URL:', imageUrl)
+                  
+                  await logPipeline(supabase, user.id, 'generation', 'success',
+                    'Image pipeline successful', {
+                      imagePrompt: imagePrompt.substring(0, 200),
+                      imageUrl,
+                      hasImageData: true
+                    })
+                } else {
+                  console.error('[Auto-Gen] Image upload failed:', uploadResult.error)
+                  await logPipeline(supabase, user.id, 'generation', 'warning',
+                    `Image upload failed: ${uploadResult.error}`)
+                }
+              } else {
+                console.error('[Auto-Gen] Stability AI failed:', stabilityResult.error)
+                await logPipeline(supabase, user.id, 'generation', 'warning',
+                  `Stability AI failed: ${stabilityResult.error}`)
+              }
+            } catch (imageError) {
+              console.error('[Auto-Gen] Image pipeline error:', imageError)
+              await logPipeline(supabase, user.id, 'generation', 'error',
+                `Image error: ${imageError instanceof Error ? imageError.message : 'Unknown'}`)
+            }
+          }
+        } else if (shouldGenerateImage && !imagePrompt) {
+          console.log('[Auto-Gen] Image enabled but no prompt created')
+        } else {
+          console.log('[Auto-Gen] Image generation NOT required')
+        }
         
         // Create platform variants
         const variants = createPlatformVariants(masterContent)
@@ -255,12 +338,22 @@ async function autoGenerateAndPublish(): Promise<{
           console.log(`[Auto-Gen] Publishing to ${platform} (${account.username})...`)
           
           try {
+            // Prepare media URLs if image was generated
+            const mediaUrls: string[] = []
+            if (imageUrl) {
+              mediaUrls.push(imageUrl)
+              console.log(`[Auto-Gen] Including image in post: ${imageUrl}`)
+            }
+            
             const publishArgs: PublishArgs = {
               accessToken: account.access_token,
               platformUserId: account.platform_user_id || account.username,
               content,
+              mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
               tokenExpiresAt: account.token_expires_at || null,
             }
+            
+            console.log(`[Auto-Gen] Publishing with ${mediaUrls.length} media attachment(s)`)
             
             let publishResult
             
@@ -290,6 +383,14 @@ async function autoGenerateAndPublish(): Promise<{
               platform_post_id: publishResult.postId,
               generation_prompt: prompt,
               generation_model: model,
+              generation_metadata: {
+                master_content: masterContent,
+                image_prompt: imagePrompt || null,
+                image_generation_enabled: shouldGenerateImage,
+                has_image: !!(imageData || imageUrl)
+              },
+              image_url: imageUrl || null,
+              image_data: imageData || null,
               topic,
             }
             await supabase.from('posts').insert(publishedPost)
@@ -316,6 +417,14 @@ async function autoGenerateAndPublish(): Promise<{
               platform,
               generation_prompt: prompt,
               generation_model: model,
+              generation_metadata: {
+                master_content: masterContent,
+                image_prompt: imagePrompt || null,
+                image_generation_enabled: shouldGenerateImage,
+                has_image: !!(imageData || imageUrl)
+              },
+              image_url: imageUrl || null,
+              image_data: imageData || null,
               topic,
             }
             await supabase.from('posts').insert(failedPost)
