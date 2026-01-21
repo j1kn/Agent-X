@@ -6,16 +6,26 @@ export interface GenerateOptions {
   tone: string
   recentPosts?: string[]
   format?: string
+  generateImagePrompt?: boolean
+}
+
+export interface GenerateResult {
+  content: string
+  prompt: string
+  model: string
+  imagePrompt?: string
 }
 
 /**
  * Generate content using built-in Claude API key from env vars
  * Server-side only - never exposes API key to client
+ *
+ * Can also generate detailed image prompts for Stability AI
  */
 export async function generateContent(
   userId: string,
   options: GenerateOptions
-): Promise<{ content: string; prompt: string; model: string }> {
+): Promise<GenerateResult> {
   // Read Claude API key from env (server-side only)
   const claudeApiKey = process.env.CLAUDE_API_KEY
 
@@ -77,11 +87,61 @@ export async function generateContent(
     console.error('[AI Generator] Failed to log usage:', logError)
   }
 
-  return {
+  const result: GenerateResult = {
     content: content.trim(),
     prompt,
     model,
   }
+
+  // Generate image prompt if requested
+  if (options.generateImagePrompt) {
+    try {
+      console.log('[AI Generator] Generating image prompt with Claude...')
+      const imagePrompt = await generateImagePromptWithClaude(claudeApiKey, content.trim())
+      result.imagePrompt = imagePrompt
+      console.log('[AI Generator] ✓ Image prompt created:', imagePrompt.substring(0, 100) + '...')
+    } catch (error) {
+      console.error('[AI Generator] Failed to generate image prompt:', error)
+      // Don't fail the whole generation if image prompt fails
+    }
+  }
+
+  return result
+}
+
+/**
+ * Generate a detailed image prompt using Claude
+ * This prompt will be used by Stability AI to generate the actual image
+ */
+async function generateImagePromptWithClaude(
+  apiKey: string,
+  postContent: string
+): Promise<string> {
+  const prompt = `You are an expert at creating image generation prompts for AI image generators like Stability AI.
+
+Based on this social media post:
+"${postContent}"
+
+Create a detailed, vivid image generation prompt that will produce a professional, eye-catching image perfect for social media.
+
+Requirements:
+- Describe the main subject clearly and specifically
+- Include visual style (e.g., "modern digital art", "photorealistic", "minimalist illustration", "vibrant 3D render")
+- Specify colors, mood, and atmosphere
+- Mention composition and framing
+- Make it suitable for 1024x1024 square format
+- Keep it under 150 words
+- Focus on visual elements, not text or words in the image
+
+Return ONLY the image generation prompt, nothing else. No explanations, no meta-commentary.`
+
+  const imagePrompt = await generateWithAnthropic(apiKey, prompt, 'claude-sonnet-4-5')
+  
+  if (!imagePrompt || imagePrompt.trim().length < 10) {
+    throw new Error('Generated image prompt is too short or empty')
+  }
+  
+  return imagePrompt.trim()
 }
 
 function buildPrompt(options: GenerateOptions, trainingInstructions?: string): string {

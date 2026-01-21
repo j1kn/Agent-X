@@ -20,8 +20,7 @@ import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
-import { createImagePromptWithGemini, validateImageGenerationConfig } from '@/lib/ai/providers/gemini-image'
-import { generateImageWithStability, validateStabilityApiKey } from '@/lib/ai/providers/stability-image'
+import { generateImageWithStability } from '@/lib/ai/providers/stability-image'
 import { uploadImageToStorage } from '@/lib/storage/image-upload'
 import type { PublishArgs } from '@/lib/pipeline/types'
 import type { Database, Json } from '@/types/database'
@@ -45,8 +44,6 @@ type UserProfile = {
   topics: string[] | null
   tone: string | null
   autopilot_enabled: boolean | null
-  gemini_api_key: string | null
-  stability_api_key: string | null
 }
 
 
@@ -75,7 +72,7 @@ export async function POST() {
     // Step 1: Get all users with autopilot enabled
     const { data: users, error: usersError } = await supabase
       .from('user_profiles')
-      .select('id, topics, tone, autopilot_enabled, gemini_api_key, stability_api_key')
+      .select('id, topics, tone, autopilot_enabled')
       .eq('autopilot_enabled', true)
     
     if (usersError) {
@@ -178,56 +175,55 @@ export async function POST() {
         const shouldGenerateImage = shouldGenerateImageForTime(schedule, matchResult.matchedTime)
         console.log(`Image generation: ${shouldGenerateImage ? 'ENABLED' : 'DISABLED'} for time ${matchResult.matchedTime}`)
         
-        // Generate content
-        console.log('Generating content...')
-        const { content: masterContent, prompt, model } = await generateContent(user.id, {
+        // Generate content with Claude (and image prompt if needed)
+        console.log('Generating content with Claude...')
+        const result = await generateContent(user.id, {
           topic,
           tone: user.tone || 'professional',
           recentPosts: recentContents,
+          generateImagePrompt: shouldGenerateImage, // Claude creates image prompt too!
         })
         
-        console.log(`✓ Content generated (${masterContent.length} chars)`)
-        await logPipeline(supabase, user.id, 'generation', 'success', 'Content generated', { model, contentLength: masterContent.length })
+        const masterContent = result.content
+        const prompt = result.prompt
+        const model = result.model
+        let imagePrompt = result.imagePrompt
         
-        // STRICT IMAGE GENERATION WORKFLOW
-        let imagePrompt: string | undefined
+        console.log(`✓ Content generated (${masterContent.length} chars)`)
+        if (imagePrompt) {
+          console.log(`✓ Image prompt generated (${imagePrompt.length} chars)`)
+        }
+        await logPipeline(supabase, user.id, 'generation', 'success', 'Content generated', {
+          model,
+          contentLength: masterContent.length,
+          hasImagePrompt: !!imagePrompt
+        })
+        
+        // SIMPLIFIED IMAGE GENERATION WORKFLOW
         let imageData: string | undefined
         let imageUrl: string | undefined
         
-        if (shouldGenerateImage) {
+        if (shouldGenerateImage && imagePrompt) {
           console.log('[Workflow] Image generation REQUIRED for this time slot')
           
-          // Validate API keys
-          const geminiValidation = validateImageGenerationConfig(user.gemini_api_key)
-          const stabilityValidation = validateStabilityApiKey(user.stability_api_key)
+          // Check if Stability API key is configured (built-in environment variable)
+          const stabilityApiKey = process.env.STABILITY_API_KEY
           
-          if (!geminiValidation.valid) {
-            console.error('[Workflow] Gemini validation failed:', geminiValidation.error)
+          if (!stabilityApiKey) {
+            console.error('[Workflow] STABILITY_API_KEY not configured in environment variables')
             await logPipeline(supabase, user.id, 'generation', 'error',
-              `Image generation failed: ${geminiValidation.error}`)
-          } else if (!stabilityValidation.valid) {
-            console.error('[Workflow] Stability validation failed:', stabilityValidation.error)
-            await logPipeline(supabase, user.id, 'generation', 'error',
-              `Image generation failed: ${stabilityValidation.error}`)
+              'Image generation failed: STABILITY_API_KEY not configured')
           } else {
             try {
-              console.log('[Workflow] Starting COMPLETE image generation pipeline...')
+              console.log('[Workflow] SIMPLIFIED image pipeline:')
               console.log('[Workflow] Step 1: Claude generates post content ✓')
-              console.log('[Workflow] Step 2: Gemini creates detailed image prompt...')
+              console.log('[Workflow] Step 2: Claude creates image prompt ✓')
+              console.log('[Workflow] Step 3: Stability AI generates image...')
               
-              // STEP 2: Create image prompt with Gemini
-              imagePrompt = await createImagePromptWithGemini(
-                masterContent,
-                user.gemini_api_key!
-              )
-              
-              console.log('[Workflow] ✓ Image prompt created:', imagePrompt.substring(0, 100) + '...')
-              console.log('[Workflow] Step 3: Stability AI generates image from prompt...')
-              
-              // STEP 3: Generate image with Stability AI
+              // Generate image with Stability AI (using built-in API key)
               const stabilityResult = await generateImageWithStability({
                 prompt: imagePrompt,
-                apiKey: user.stability_api_key!,
+                apiKey: stabilityApiKey,
               })
               
               if (stabilityResult.success && stabilityResult.base64Data) {
@@ -235,7 +231,7 @@ export async function POST() {
                 console.log('[Workflow] ✓ Image generated by Stability AI!')
                 console.log('[Workflow] Step 4: Uploading image to Supabase Storage...')
                 
-                // STEP 4: Upload to Supabase Storage to get public URL
+                // Upload to Supabase Storage to get public URL
                 const uploadResult = await uploadImageToStorage(
                   stabilityResult.base64Data,
                   user.id
@@ -246,7 +242,7 @@ export async function POST() {
                   console.log('[Workflow] ✓ Image uploaded! URL:', imageUrl)
                   
                   await logPipeline(supabase, user.id, 'generation', 'success',
-                    'Complete image pipeline successful', {
+                    'Image pipeline successful', {
                       imagePrompt: imagePrompt.substring(0, 200),
                       imageUrl,
                       hasImageData: true
@@ -268,6 +264,8 @@ export async function POST() {
                 `Image pipeline error: ${imageError instanceof Error ? imageError.message : 'Unknown'}`)
             }
           }
+        } else if (shouldGenerateImage && !imagePrompt) {
+          console.log('[Workflow] Image generation enabled but Claude did not create prompt')
         } else {
           console.log('[Workflow] Image generation NOT required for this time slot')
         }

@@ -32,19 +32,45 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 CLAUDE_API_KEY=sk-ant-api03-your-key-here
 ```
 
-**This is the brain of Agent X!** Used for ALL content generation.
+**This is the brain of Agent X!** Used for:
+- ✅ Post content generation
+- ✅ Image prompt creation (for Stability AI)
+- ✅ All AI-powered features
 
 **Get from**: https://console.anthropic.com/
 
 **Important**:
-- ✅ This is the ONLY AI key you need
 - ✅ All users share this central AI key
 - ✅ Users do NOT provide their own AI keys
 - ✅ Agent X will not work without this key
 
 ---
 
-### 4. LinkedIn OAuth (OPTIONAL)
+### 4. Stability AI API Key (REQUIRED for Images) 🎨
+```
+STABILITY_API_KEY=sk-your-stability-key-here
+```
+
+**Used for**: AI image generation with Stability AI SDXL
+
+**Get from**: https://platform.stability.ai/
+
+**Important**:
+- ✅ Required for automated image generation
+- ✅ All users share this central key
+- ✅ Cost: ~$0.002 per 1024x1024 image
+- ✅ Claude creates the prompts, Stability generates the images
+
+**How it works**:
+1. Claude generates post content
+2. Claude creates detailed image prompt
+3. Stability AI generates image from prompt
+4. Image uploaded to Supabase Storage
+5. Post published with image
+
+---
+
+### 5. LinkedIn OAuth (OPTIONAL)
 ```
 LINKEDIN_CLIENT_ID=your-client-id
 LINKEDIN_CLIENT_SECRET=your-client-secret
@@ -101,6 +127,44 @@ If you see "⚠ AI Not Available":
 
 - **X (Twitter)**: Users provide their own OAuth 1.0a credentials (not env vars)
 - **Telegram**: Users provide their own Bot Token (not env vars)
-- **No user AI keys needed**: Agent X uses your central Claude key
+- **No user AI keys needed**: Agent X uses your central Claude + Stability keys
 - **LinkedIn is optional**: Only configure if users need Company Page posting
+- **Image generation**: Fully automated with Claude + Stability AI
+- **Cost per post with image**: ~$0.012 (Claude + Stability combined)
+
+---
+
+## Architecture Overview
+
+### Simplified AI Pipeline
+
+**Content Generation**:
+- Claude API → Post content
+
+**Image Generation** (when enabled):
+- Claude API → Detailed image prompt
+- Stability AI → Generate image from prompt
+- Supabase Storage → Host image
+- Platforms → Publish with image URL
+
+### What Changed (v2.0)
+
+**Removed**:
+- ❌ Gemini API (no longer needed)
+- ❌ Per-user API key configuration
+- ❌ Complex multi-AI setup
+
+**Added**:
+- ✅ Claude creates both content AND image prompts
+- ✅ Stability AI as built-in image generator
+- ✅ Single, simplified pipeline
+- ✅ Better image quality and context
+
+### Benefits
+
+1. **Simpler Setup**: Only 2 AI keys (Claude + Stability)
+2. **Better Integration**: Claude understands post context for images
+3. **Cost Effective**: ~$0.012 per post with image
+4. **No User Config**: All AI keys are server-side
+5. **Reliable**: Professional-grade APIs with high uptime
 
