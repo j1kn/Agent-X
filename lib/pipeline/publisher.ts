@@ -53,6 +53,8 @@ export async function publishScheduledPosts(): Promise<{
       const postId = post.id
       const userId = post.user_id
       const content = post.content
+      const imageUrl = post.image_url
+      const imageData = post.image_data
       const account = post.connected_accounts as any
 
       if (!account) {
@@ -74,12 +76,19 @@ export async function publishScheduledPosts(): Promise<{
       }
 
       console.log(`[Publisher] Publishing post ${postId} to ${platform}`)
+      
+      // Check if post has an image
+      const hasImage = !!(imageUrl || imageData)
+      if (hasImage) {
+        console.log(`[Publisher] Post has image attached: ${imageUrl ? 'URL' : 'base64 data'}`)
+      }
 
       // Build standardized arguments object
       const publishArgs: PublishArgs = {
         accessToken: account.access_token,
         platformUserId: account.platform_user_id || account.username, // Use org ID for LinkedIn, username for Telegram
         content,
+        mediaUrls: hasImage && imageUrl ? [imageUrl] : undefined,
         tokenExpiresAt: account.token_expires_at || null,
       }
 
