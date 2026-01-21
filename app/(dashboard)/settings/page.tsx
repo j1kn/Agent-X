@@ -14,6 +14,9 @@ export default function SettingsPage() {
   const [isGeminiConnected, setIsGeminiConnected] = useState(false)
   const [geminiApiKey, setGeminiApiKey] = useState('')
   const [showGeminiKey, setShowGeminiKey] = useState(false)
+  const [stabilityApiKey, setStabilityApiKey] = useState('')
+  const [showStabilityKey, setShowStabilityKey] = useState(false)
+  const [isStabilityConnected, setIsStabilityConnected] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -36,6 +39,7 @@ export default function SettingsPage() {
       
       setIsAiConnected(data.isAiConnected || false)
       setIsGeminiConnected(data.isGeminiConnected || false)
+      setIsStabilityConnected(data.isStabilityConnected || false)
     } catch (error) {
       console.error('Failed to fetch settings:', error)
     } finally {
@@ -54,6 +58,7 @@ export default function SettingsPage() {
         tone,
         posting_frequency: frequency,
         gemini_api_key: geminiApiKey || null,
+        stability_api_key: stabilityApiKey || null,
       }
 
       const response = await fetch('/api/settings', {
@@ -129,7 +134,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Gemini Image Generation */}
+        {/* AI Image Generation */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border-2 border-purple-200 dark:border-purple-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
@@ -138,24 +143,25 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                  Gemini Image Generation
+                  AI Image Generation
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Add AI-generated images to your posts
+                  Gemini + Stability AI for stunning images
                 </p>
               </div>
             </div>
-            {isGeminiConnected && (
+            {isGeminiConnected && isStabilityConnected && (
               <span className="px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100">
-                Connected
+                Fully Connected
               </span>
             )}
           </div>
 
           <div className="space-y-4">
+            {/* Gemini API Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Gemini API Key
+                Gemini API Key (for image prompts)
               </label>
               <div className="flex space-x-2">
                 <div className="flex-1 relative">
@@ -164,7 +170,7 @@ export default function SettingsPage() {
                     value={geminiApiKey}
                     onChange={(e) => setGeminiApiKey(e.target.value)}
                     className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm text-gray-900 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                    placeholder={isGeminiConnected ? '••••••••••••••••' : 'Enter your Gemini API key'}
+                    placeholder={isGeminiConnected ? '••••••••••••••••' : 'AIza...'}
                   />
                 </div>
                 <button
@@ -175,8 +181,8 @@ export default function SettingsPage() {
                   {showGeminiKey ? '👁️' : '👁️‍🗨️'}
                 </button>
               </div>
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Get your API key from{' '}
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Get from{' '}
                 <a
                   href="https://makersuite.google.com/app/apikey"
                   target="_blank"
@@ -188,15 +194,52 @@ export default function SettingsPage() {
               </p>
             </div>
 
+            {/* Stability API Key */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Stability AI API Key (for image generation)
+              </label>
+              <div className="flex space-x-2">
+                <div className="flex-1 relative">
+                  <input
+                    type={showStabilityKey ? 'text' : 'password'}
+                    value={stabilityApiKey}
+                    onChange={(e) => setStabilityApiKey(e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm text-gray-900 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    placeholder={isStabilityConnected ? '••••••••••••••••' : 'sk-...'}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStabilityKey(!showStabilityKey)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  {showStabilityKey ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Get from{' '}
+                <a
+                  href="https://platform.stability.ai/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-600 hover:text-purple-500 dark:text-purple-400"
+                >
+                  Stability AI Platform
+                </a>
+              </p>
+            </div>
+
             <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-md p-4">
               <h3 className="text-sm font-medium text-purple-800 dark:text-purple-200 mb-2">
-                ✨ How Image Generation Works
+                ✨ Complete Image Pipeline
               </h3>
               <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1 list-disc list-inside">
-                <li>Configure image times in the Schedule page</li>
-                <li>Gemini creates image prompts based on your post content</li>
-                <li>Images are automatically generated and attached to posts</li>
-                <li>Works with all connected platforms (X, Telegram, LinkedIn)</li>
+                <li><strong>Step 1:</strong> Claude generates post content</li>
+                <li><strong>Step 2:</strong> Gemini creates detailed image prompt</li>
+                <li><strong>Step 3:</strong> Stability AI generates high-quality image</li>
+                <li><strong>Step 4:</strong> Image uploaded to Supabase Storage</li>
+                <li><strong>Step 5:</strong> Post published with image attached</li>
               </ul>
             </div>
           </div>

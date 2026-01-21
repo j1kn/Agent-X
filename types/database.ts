@@ -21,6 +21,7 @@ export interface Database {
           training_instructions: string | null
           autopilot_enabled: boolean | null
           gemini_api_key: string | null
+          stability_api_key: string | null
           created_at: string
           updated_at: string
         }
@@ -35,6 +36,7 @@ export interface Database {
           training_instructions?: string | null
           autopilot_enabled?: boolean | null
           gemini_api_key?: string | null
+          stability_api_key?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -49,6 +51,7 @@ export interface Database {
           training_instructions?: string | null
           autopilot_enabled?: boolean | null
           gemini_api_key?: string | null
+          stability_api_key?: string | null
           created_at?: string
           updated_at?: string
         }

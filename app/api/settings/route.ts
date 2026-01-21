@@ -9,6 +9,7 @@ type UserProfile = {
   tone: string | null
   posting_frequency: string | null
   gemini_api_key: string | null
+  stability_api_key: string | null
 }
 
 export async function GET() {
@@ -22,7 +23,7 @@ export async function GET() {
 
   const { data: profileData, error } = await supabase
     .from('user_profiles')
-    .select('topics, tone, posting_frequency, gemini_api_key')
+    .select('topics, tone, posting_frequency, gemini_api_key, stability_api_key')
     .eq('id', user.id)
     .single()
 
@@ -35,6 +36,7 @@ export async function GET() {
   // AI is always connected via built-in Claude key
   const isAiConnected = !!process.env.CLAUDE_API_KEY
   const isGeminiConnected = !!(profile?.gemini_api_key)
+  const isStabilityConnected = !!(profile?.stability_api_key)
 
   return NextResponse.json({
     profile: profile ? {
@@ -42,9 +44,11 @@ export async function GET() {
       tone: profile.tone,
       posting_frequency: profile.posting_frequency,
       gemini_api_key: profile.gemini_api_key ? '••••••••' : null, // Mask the key
+      stability_api_key: profile.stability_api_key ? '••••••••' : null, // Mask the key
     } : null,
     isAiConnected,
     isGeminiConnected,
+    isStabilityConnected,
     aiProvider: 'Claude (Built-in)' // Show users we're using Claude
   })
 }
@@ -58,8 +62,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Accept topics, tone, posting_frequency, and gemini_api_key
-  const { topics, tone, posting_frequency, gemini_api_key } = await request.json()
+  // Accept topics, tone, posting_frequency, gemini_api_key, and stability_api_key
+  const { topics, tone, posting_frequency, gemini_api_key, stability_api_key } = await request.json()
 
   const updateData: Record<string, unknown> = {}
 
@@ -67,6 +71,7 @@ export async function POST(request: Request) {
   if (tone) updateData.tone = tone
   if (posting_frequency) updateData.posting_frequency = posting_frequency
   if (gemini_api_key !== undefined) updateData.gemini_api_key = gemini_api_key
+  if (stability_api_key !== undefined) updateData.stability_api_key = stability_api_key
 
   const { error } = await supabase
     .from('user_profiles')
