@@ -82,10 +82,12 @@ export async function GET() {
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('state', state)
-  // PATH A: OpenID Connect - MUST include 'openid' scope for /v2/userinfo endpoint
-  // openid = required for OIDC identity endpoint
-  // w_member_social = required for posting to personal feed
-  authUrl.searchParams.set('scope', 'openid w_member_social')
+  // PATH A: OpenID Connect - COMPLETE REQUIRED SCOPES
+  // openid = REQUIRED for OIDC
+  // profile = REQUIRED identity scope for OIDC
+  // email = REQUIRED identity scope for OIDC
+  // w_member_social = REQUIRED for posting to personal feed
+  authUrl.searchParams.set('scope', 'openid profile email w_member_social')
 
   const finalUrl = authUrl.toString()
   
