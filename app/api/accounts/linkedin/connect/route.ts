@@ -87,7 +87,8 @@ export async function GET() {
   // profile = REQUIRED identity scope for OIDC
   // email = REQUIRED identity scope for OIDC
   // w_member_social = REQUIRED for posting to personal feed
-  authUrl.searchParams.set('scope', 'openid profile email w_member_social')
+  // rw_organization_admin = REQUIRED for fetching and managing company pages
+  authUrl.searchParams.set('scope', 'openid profile email w_member_social rw_organization_admin')
 
   const finalUrl = authUrl.toString()
   
