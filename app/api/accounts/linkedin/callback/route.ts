@@ -145,7 +145,7 @@ export async function GET(request: Request) {
     const tokenData = await tokenResponse.json()
     console.log('[LinkedIn OAuth] Token data keys:', Object.keys(tokenData))
     
-    const { access_token, expires_in } = tokenData
+    const { access_token, expires_in, scope } = tokenData
 
     if (!access_token) {
       console.error('[LinkedIn OAuth] ❌ No access_token in response:', tokenData)
@@ -154,6 +154,15 @@ export async function GET(request: Request) {
 
     console.log('[LinkedIn OAuth] ✓ Access token received')
     console.log('[LinkedIn OAuth] Expires in:', expires_in, 'seconds')
+    console.log('[LinkedIn OAuth] Scopes granted:', scope || 'not provided')
+    
+    // Verify we have the required scopes
+    if (scope && !scope.includes('openid')) {
+      console.warn('[LinkedIn OAuth] ⚠️  WARNING: "openid" scope not granted - /v2/userinfo may fail')
+    }
+    if (scope && scope.includes('openid')) {
+      console.log('[LinkedIn OAuth] ✓ OpenID scope confirmed - /v2/userinfo should work')
+    }
 
     // STEP 6: Fetch LinkedIn identity using OIDC userinfo endpoint
     console.log('[LinkedIn OAuth] ========== FETCHING IDENTITY ==========')

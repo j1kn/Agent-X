@@ -82,9 +82,10 @@ export async function GET() {
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('state', state)
-  // SIMPLIFIED: Start with personal posting only (w_member_social)
-  // Company pages will be added after personal posting works
-  authUrl.searchParams.set('scope', 'w_member_social')
+  // PATH A: OpenID Connect - MUST include 'openid' scope for /v2/userinfo endpoint
+  // openid = required for OIDC identity endpoint
+  // w_member_social = required for posting to personal feed
+  authUrl.searchParams.set('scope', 'openid w_member_social')
 
   const finalUrl = authUrl.toString()
   
