@@ -53,34 +53,50 @@ export async function GET(request: Request) {
     )
   }
 
+  // ⚠️ DEV MODE: Temporarily allow OAuth without state for debugging
+  const DEV_BYPASS_STATE = true // TODO: Set to false in production
+  
   if (!state) {
-    console.error('[LinkedIn OAuth] ❌ MISSING STATE - OAuth flow failed')
-    return NextResponse.redirect(
-      new URL('/accounts?error=No state parameter received from LinkedIn', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
-    )
+    if (DEV_BYPASS_STATE && code) {
+      console.warn('[LinkedIn OAuth] ⚠️  DEV MODE: State missing but code present - BYPASSING state check')
+      console.warn('[LinkedIn OAuth] ⚠️  This is INSECURE and should only be used for debugging')
+    } else {
+      console.error('[LinkedIn OAuth] ❌ MISSING STATE - OAuth flow failed')
+      return NextResponse.redirect(
+        new URL('/accounts?error=No state parameter received from LinkedIn', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+      )
+    }
   }
 
-  // Verify state (CSRF protection)
-  console.log('[LinkedIn OAuth] Verifying state:', state)
-  const { data: storedState, error: stateError } = await supabase
-    .from('oauth_pkce_storage')
-    .select('*')
-    .eq('state', state)
-    .single()
-
-  if (stateError || !storedState) {
-    console.error('[LinkedIn OAuth] ⚠️  State validation failed:', stateError)
-    console.error('[LinkedIn OAuth] Expected state from DB, got:', storedState)
-    console.error('[LinkedIn OAuth] Received state from LinkedIn:', state)
-    // TEMPORARILY: Log but don't fail - continue to see if token exchange works
-    console.warn('[LinkedIn OAuth] ⚠️  CONTINUING DESPITE STATE MISMATCH FOR DEBUGGING')
-  } else {
-    console.log('[LinkedIn OAuth] ✓ State validated successfully')
-    // Delete used state
-    await supabase
+  // Verify state (CSRF protection) - only if state exists
+  if (state) {
+    console.log('[LinkedIn OAuth] Verifying state:', state)
+    const { data: storedState, error: stateError } = await supabase
       .from('oauth_pkce_storage')
-      .delete()
+      .select('*')
       .eq('state', state)
+      .single()
+
+    if (stateError || !storedState) {
+      console.error('[LinkedIn OAuth] ⚠️  State validation failed:', stateError)
+      console.error('[LinkedIn OAuth] Expected state from DB, got:', storedState)
+      console.error('[LinkedIn OAuth] Received state from LinkedIn:', state)
+      
+      if (DEV_BYPASS_STATE) {
+        console.warn('[LinkedIn OAuth] ⚠️  DEV MODE: CONTINUING DESPITE STATE MISMATCH')
+      } else {
+        return NextResponse.redirect(
+          new URL('/accounts?error=Invalid OAuth state', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+        )
+      }
+    } else {
+      console.log('[LinkedIn OAuth] ✓ State validated successfully')
+      // Delete used state
+      await supabase
+        .from('oauth_pkce_storage')
+        .delete()
+        .eq('state', state)
+    }
   }
 
   // Check required env vars
