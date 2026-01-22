@@ -187,48 +187,85 @@ export async function getLinkedInOrganizations(accessToken: string): Promise<Arr
   name: string
 }>> {
   try {
-    // Fetch organizations where user has ADMINISTRATOR role using modern API
+    console.log('[LinkedIn] Fetching organizations with ADMINISTRATOR role...')
+    
+    // Use organizationalEntityAcls endpoint (OIDC-compatible)
     const response = await fetch(
-      'https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&projection=(elements*(organization~(localizedName,id),roleAssignee,state))',
+      'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR',
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202401',
           'X-Restli-Protocol-Version': '2.0.0',
         },
       }
     )
 
+    console.log('[LinkedIn] Organizations API response status:', response.status)
+
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[LinkedIn] Failed to fetch organizations:', response.status, errorText)
+      console.error('[LinkedIn] Failed to fetch organizations')
+      console.error('[LinkedIn] Status:', response.status)
+      console.error('[LinkedIn] Response:', errorText)
       throw new Error(`Failed to fetch organizations: ${response.status}`)
     }
 
     const data = await response.json()
     console.log('[LinkedIn] Organizations response:', JSON.stringify(data, null, 2))
     
-    // Parse organization data from LinkedIn's complex response format
-    const organizations = []
+    // Parse organization data from LinkedIn's response
+    const organizations: Array<{ id: string; name: string }> = []
     
-    if (data.elements) {
+    if (data.elements && Array.isArray(data.elements)) {
       for (const element of data.elements) {
-        // Check if the ACL is active
-        if (element.state !== 'APPROVED') continue
+        // Extract organization target
+        const orgTarget = element.organizationalTarget
+        if (!orgTarget) continue
         
-        const org = element['organization~']
-        if (org && org.id) {
-          // Extract numeric ID from URN (e.g., "urn:li:organization:12345" -> "12345")
-          const orgId = org.id.split(':').pop()
-          const orgName = org.localizedName || org.name?.localized?.en_US || `Organization ${orgId}`
+        // Extract organization ID from URN (e.g., "urn:li:organization:12345" -> "12345")
+        const orgId = orgTarget.split(':').pop()
+        if (!orgId) continue
+        
+        // Fetch organization details to get name
+        try {
+          const orgResponse = await fetch(
+            `https://api.linkedin.com/v2/organizations/${orgId}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'X-Restli-Protocol-Version': '2.0.0',
+              },
+            }
+          )
+          
+          if (orgResponse.ok) {
+            const orgData = await orgResponse.json()
+            const orgName = orgData.localizedName || orgData.name?.localized?.en_US || `Organization ${orgId}`
+            organizations.push({
+              id: orgId,
+              name: orgName,
+            })
+            console.log('[LinkedIn] ✓ Found organization:', orgName, `(ID: ${orgId})`)
+          } else {
+            // If we can't fetch details, still add with ID
+            organizations.push({
+              id: orgId,
+              name: `Organization ${orgId}`,
+            })
+            console.log('[LinkedIn] ⚠️  Added organization without name (ID: ${orgId})')
+          }
+        } catch (orgError) {
+          console.error('[LinkedIn] Failed to fetch org details for', orgId, orgError)
+          // Still add the organization
           organizations.push({
             id: orgId,
-            name: orgName,
+            name: `Organization ${orgId}`,
           })
         }
       }
     }
 
+    console.log('[LinkedIn] Total organizations found:', organizations.length)
     return organizations
   } catch (error) {
     console.error('[LinkedIn] Error fetching organizations:', error)
