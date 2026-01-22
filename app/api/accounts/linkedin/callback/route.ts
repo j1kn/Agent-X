@@ -139,29 +139,38 @@ export async function GET(request: Request) {
     console.log('[LinkedIn OAuth] ✓ Access token received')
     console.log('[LinkedIn OAuth] Expires in:', expires_in, 'seconds')
 
-    // STEP 6: Fetch LinkedIn identity (personal profile)
+    // STEP 6: Fetch LinkedIn identity using OIDC userinfo endpoint
     console.log('[LinkedIn OAuth] ========== FETCHING IDENTITY ==========')
-    const meResponse = await fetch('https://api.linkedin.com/v2/me', {
+    console.log('[LinkedIn OAuth] Using OIDC endpoint: /v2/userinfo')
+    
+    const userinfoResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
     })
 
-    if (!meResponse.ok) {
-      const errorText = await meResponse.text()
-      console.error('[LinkedIn OAuth] ❌ Failed to fetch identity:', errorText)
-      throw new Error(`Failed to fetch LinkedIn identity: ${meResponse.status}`)
+    console.log('[LinkedIn OAuth] Userinfo response status:', userinfoResponse.status)
+
+    if (!userinfoResponse.ok) {
+      const errorText = await userinfoResponse.text()
+      console.error('[LinkedIn OAuth] ❌ Failed to fetch identity')
+      console.error('[LinkedIn OAuth] Status:', userinfoResponse.status)
+      console.error('[LinkedIn OAuth] Response:', errorText)
+      throw new Error(`Failed to fetch LinkedIn identity: ${userinfoResponse.status}`)
     }
 
-    const meData = await meResponse.json()
-    console.log('[LinkedIn OAuth] Identity data:', meData)
+    const userinfoData = await userinfoResponse.json()
+    console.log('[LinkedIn OAuth] Userinfo data:', userinfoData)
     
-    const personId = meData.id
+    // Extract 'sub' which is the LinkedIn member ID
+    const personId = userinfoData.sub
     if (!personId) {
-      throw new Error('No person ID in LinkedIn response')
+      console.error('[LinkedIn OAuth] ❌ No "sub" field in userinfo response')
+      throw new Error('No person ID (sub) in LinkedIn userinfo response')
     }
 
     const authorUrn = `urn:li:person:${personId}`
+    console.log('[LinkedIn OAuth] ✓ Person ID (sub):', personId)
     console.log('[LinkedIn OAuth] ✓ Author URN:', authorUrn)
 
     // STEP 7: TEMPORARILY SKIP company page logic
