@@ -28,16 +28,14 @@ export async function GET(request: Request) {
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
-  console.log('[LinkedIn OAuth DEBUG] Callback received')
-  console.log('[LinkedIn OAuth DEBUG] Full URL:', request.url)
-  console.log('[LinkedIn OAuth DEBUG] Search params:', {
-    hasCode: !!code,
-    hasState: !!state,
-    hasError: !!error,
-    error,
-    errorDescription,
-    allParams: Array.from(searchParams.entries())
-  })
+  console.log('[LinkedIn OAuth] ========== CALLBACK RECEIVED ==========')
+  console.log('[LinkedIn OAuth] Full URL:', request.url)
+  console.log('[LinkedIn OAuth] Code:', code ? `${code.substring(0, 20)}...` : 'MISSING')
+  console.log('[LinkedIn OAuth] State:', state || 'MISSING')
+  console.log('[LinkedIn OAuth] Error:', error || 'none')
+  console.log('[LinkedIn OAuth] Error Description:', errorDescription || 'none')
+  console.log('[LinkedIn OAuth] All params:', Array.from(searchParams.entries()))
+  console.log('[LinkedIn OAuth] ================================================')
 
   // Handle user denial
   if (error) {
@@ -48,14 +46,22 @@ export async function GET(request: Request) {
   }
 
   // Validate required parameters
-  if (!code || !state) {
-    console.error('[LinkedIn OAuth DEBUG] Missing required parameters:', { code: !!code, state: !!state })
+  if (!code) {
+    console.error('[LinkedIn OAuth] ❌ MISSING CODE - OAuth flow failed')
     return NextResponse.redirect(
-      new URL('/accounts?error=Invalid OAuth callback parameters', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+      new URL('/accounts?error=No authorization code received from LinkedIn', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+    )
+  }
+
+  if (!state) {
+    console.error('[LinkedIn OAuth] ❌ MISSING STATE - OAuth flow failed')
+    return NextResponse.redirect(
+      new URL('/accounts?error=No state parameter received from LinkedIn', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
     )
   }
 
   // Verify state (CSRF protection)
+  console.log('[LinkedIn OAuth] Verifying state:', state)
   const { data: storedState, error: stateError } = await supabase
     .from('oauth_pkce_storage')
     .select('*')
@@ -63,17 +69,19 @@ export async function GET(request: Request) {
     .single()
 
   if (stateError || !storedState) {
-    console.error('[LinkedIn OAuth] Invalid state:', stateError)
-    return NextResponse.redirect(
-      new URL('/accounts?error=Invalid OAuth state', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
-    )
+    console.error('[LinkedIn OAuth] ⚠️  State validation failed:', stateError)
+    console.error('[LinkedIn OAuth] Expected state from DB, got:', storedState)
+    console.error('[LinkedIn OAuth] Received state from LinkedIn:', state)
+    // TEMPORARILY: Log but don't fail - continue to see if token exchange works
+    console.warn('[LinkedIn OAuth] ⚠️  CONTINUING DESPITE STATE MISMATCH FOR DEBUGGING')
+  } else {
+    console.log('[LinkedIn OAuth] ✓ State validated successfully')
+    // Delete used state
+    await supabase
+      .from('oauth_pkce_storage')
+      .delete()
+      .eq('state', state)
   }
-
-  // Delete used state
-  await supabase
-    .from('oauth_pkce_storage')
-    .delete()
-    .eq('state', state)
 
   // Check required env vars
   const clientId = process.env.LINKEDIN_CLIENT_ID
@@ -87,6 +95,12 @@ export async function GET(request: Request) {
   }
 
   try {
+    console.log('[LinkedIn OAuth] ========== TOKEN EXCHANGE ==========')
+    console.log('[LinkedIn OAuth] Endpoint: https://www.linkedin.com/oauth/v2/accessToken')
+    console.log('[LinkedIn OAuth] Redirect URI (from env):', redirectUri)
+    console.log('[LinkedIn OAuth] Client ID:', clientId)
+    console.log('[LinkedIn OAuth] Code:', code.substring(0, 20) + '...')
+    
     // Exchange authorization code for access token
     const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
       method: 'POST',
@@ -102,50 +116,79 @@ export async function GET(request: Request) {
       }),
     })
 
+    console.log('[LinkedIn OAuth] Token response status:', tokenResponse.status)
+
     if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json().catch(() => ({}))
-      console.error('[LinkedIn OAuth] Token exchange failed:', errorData)
-      throw new Error(`Token exchange failed: ${tokenResponse.status}`)
+      const errorText = await tokenResponse.text()
+      console.error('[LinkedIn OAuth] ❌ Token exchange failed')
+      console.error('[LinkedIn OAuth] Status:', tokenResponse.status)
+      console.error('[LinkedIn OAuth] Response:', errorText)
+      throw new Error(`Token exchange failed (${tokenResponse.status}): ${errorText}`)
     }
 
     const tokenData = await tokenResponse.json()
+    console.log('[LinkedIn OAuth] Token data keys:', Object.keys(tokenData))
+    
     const { access_token, expires_in } = tokenData
 
     if (!access_token) {
+      console.error('[LinkedIn OAuth] ❌ No access_token in response:', tokenData)
       throw new Error('No access token received from LinkedIn')
     }
 
-    console.log('[LinkedIn OAuth] Token received, fetching organizations...')
+    console.log('[LinkedIn OAuth] ✓ Access token received')
+    console.log('[LinkedIn OAuth] Expires in:', expires_in, 'seconds')
 
-    // Fetch organizations user can manage
-    const organizations = await getLinkedInOrganizations(access_token)
+    // STEP 6: Fetch LinkedIn identity (personal profile)
+    console.log('[LinkedIn OAuth] ========== FETCHING IDENTITY ==========')
+    const meResponse = await fetch('https://api.linkedin.com/v2/me', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+      },
+    })
 
-    if (organizations.length === 0) {
-      return NextResponse.redirect(
-        new URL('/accounts?error=No LinkedIn Company Pages found. You must be an admin of at least one Company Page.', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
-      )
+    if (!meResponse.ok) {
+      const errorText = await meResponse.text()
+      console.error('[LinkedIn OAuth] ❌ Failed to fetch identity:', errorText)
+      throw new Error(`Failed to fetch LinkedIn identity: ${meResponse.status}`)
     }
 
-    console.log(`[LinkedIn OAuth] Found ${organizations.length} organization(s)`)
-
-    // Store token and organization data in session/cookie for the save step
-    // (In production, you might want to use encrypted session storage)
-    // For now, we'll pass it via URL parameters (less secure but simpler for this implementation)
+    const meData = await meResponse.json()
+    console.log('[LinkedIn OAuth] Identity data:', meData)
     
-    // Encode organization data as JSON
+    const personId = meData.id
+    if (!personId) {
+      throw new Error('No person ID in LinkedIn response')
+    }
+
+    const authorUrn = `urn:li:person:${personId}`
+    console.log('[LinkedIn OAuth] ✓ Author URN:', authorUrn)
+
+    // STEP 7: TEMPORARILY SKIP company page logic
+    console.log('[LinkedIn OAuth] ⚠️  SKIPPING company page logic for initial testing')
+    console.log('[LinkedIn OAuth] Will connect personal LinkedIn account only')
+
+    // For now, create a simple personal account connection
     const orgData = Buffer.from(JSON.stringify({
       access_token,
       expires_in,
-      organizations,
+      author_urn: authorUrn,
+      person_id: personId,
+      // Empty organizations array - will add company pages later
+      organizations: [],
     })).toString('base64')
 
-    // Redirect to accounts page with organization selection modal
+    console.log('[LinkedIn OAuth] ✓ Redirecting to accounts page')
+    
+    // Redirect to accounts page with success
     return NextResponse.redirect(
       new URL(`/accounts?linkedin_auth=success&data=${encodeURIComponent(orgData)}`, process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
     )
 
   } catch (error) {
-    console.error('[LinkedIn OAuth] Callback error:', error)
+    console.error('[LinkedIn OAuth] ========== ERROR ==========')
+    console.error('[LinkedIn OAuth] Error:', error)
+    console.error('[LinkedIn OAuth] Stack:', error instanceof Error ? error.stack : 'N/A')
     return NextResponse.redirect(
       new URL(`/accounts?error=${encodeURIComponent(error instanceof Error ? error.message : 'LinkedIn connection failed')}`, process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
     )

@@ -82,15 +82,20 @@ export async function GET() {
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('state', state)
-  // Updated to use modern LinkedIn API v2 scopes
-  authUrl.searchParams.set('scope', 'openid profile email w_member_social r_organization_admin w_organization_social')
+  // SIMPLIFIED: Start with personal posting only (w_member_social)
+  // Company pages will be added after personal posting works
+  authUrl.searchParams.set('scope', 'w_member_social')
 
   const finalUrl = authUrl.toString()
   
-  console.log('[LinkedIn OAuth DEBUG] Final authorization URL:', finalUrl)
-  console.log('[LinkedIn OAuth DEBUG] Redirect URI in URL:', authUrl.searchParams.get('redirect_uri'))
-  console.log('[LinkedIn OAuth DEBUG] Client ID:', clientId)
-  console.log('[LinkedIn OAuth DEBUG] Scopes:', authUrl.searchParams.get('scope'))
+  console.log('[LinkedIn OAuth] ========== AUTHORIZATION REQUEST ==========')
+  console.log('[LinkedIn OAuth] Full URL:', finalUrl)
+  console.log('[LinkedIn OAuth] Redirect URI (from env):', redirectUri)
+  console.log('[LinkedIn OAuth] Redirect URI (in URL):', authUrl.searchParams.get('redirect_uri'))
+  console.log('[LinkedIn OAuth] Client ID:', clientId)
+  console.log('[LinkedIn OAuth] State:', state)
+  console.log('[LinkedIn OAuth] Scope:', authUrl.searchParams.get('scope'))
+  console.log('[LinkedIn OAuth] ================================================')
 
   // Redirect to LinkedIn authorization page
   return NextResponse.redirect(finalUrl)
