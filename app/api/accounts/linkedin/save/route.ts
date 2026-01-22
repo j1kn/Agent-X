@@ -5,17 +5,17 @@ import { encrypt } from '@/lib/crypto/encryption'
 export const runtime = 'nodejs'
 
 /**
- * LinkedIn OAuth 2.0 - Save Selected Organization
- * 
- * After user selects which Company Page to connect,
- * this endpoint encrypts and stores the access token.
- * 
+ * LinkedIn OAuth 2.0 - Save Personal Profile Connection
+ *
+ * Saves the personal LinkedIn profile connection.
+ * Company page posting is disabled until LinkedIn approves organization access.
+ *
  * Request body:
  * {
  *   access_token: string,
  *   expires_in: number,
- *   organization_id: string,
- *   organization_name: string
+ *   person_id: string,
+ *   author_urn: string
  * }
  */
 export async function POST(request: Request) {
@@ -28,12 +28,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { access_token, expires_in, organization_id, organization_name } = await request.json()
+    const { access_token, expires_in, person_id, author_urn } = await request.json()
 
     // Validate required fields
-    if (!access_token || !organization_id || !organization_name) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: access_token, organization_id, organization_name' 
+    if (!access_token || !person_id || !author_urn) {
+      return NextResponse.json({
+        error: 'Missing required fields: access_token, person_id, author_urn'
       }, { status: 400 })
     }
 
@@ -41,21 +41,21 @@ export async function POST(request: Request) {
     const encryptedToken = encrypt(access_token)
 
     // Calculate token expiration time
-    const expiresAt = expires_in 
+    const expiresAt = expires_in
       ? new Date(Date.now() + expires_in * 1000).toISOString()
       : null
 
-    // Save to connected_accounts table
+    // Save to connected_accounts table (personal profile only)
     const { error: dbError } = await supabase
       .from('connected_accounts')
       // @ts-expect-error - Supabase upsert type inference issue
       .upsert({
         user_id: user.id,
         platform: 'linkedin',
-        platform_user_id: organization_id,
+        platform_user_id: person_id,
         access_token: encryptedToken,
         token_expires_at: expiresAt,
-        username: organization_name,
+        username: 'Personal Profile', // Personal profile - company pages disabled
         is_active: true,
       }, {
         onConflict: 'user_id,platform',
@@ -63,18 +63,19 @@ export async function POST(request: Request) {
 
     if (dbError) {
       console.error('[LinkedIn Save] Database error:', dbError)
-      return NextResponse.json({ 
-        error: 'Failed to save LinkedIn connection' 
+      return NextResponse.json({
+        error: 'Failed to save LinkedIn connection'
       }, { status: 500 })
     }
 
-    console.log(`[LinkedIn Save] Successfully connected: ${organization_name} (${organization_id})`)
+    console.log(`[LinkedIn Save] Successfully connected personal profile (${person_id})`)
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      organization: {
-        id: organization_id,
-        name: organization_name,
+      profile: {
+        id: person_id,
+        urn: author_urn,
+        type: 'personal'
       }
     })
 

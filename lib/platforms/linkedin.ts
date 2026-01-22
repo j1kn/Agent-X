@@ -6,12 +6,12 @@ import type { EngagementMetrics } from './types'
 // Always derive new variables (finalContent, finalText, etc).
 
 /**
- * LinkedIn Company Page Posting
+ * LinkedIn Personal Profile Posting
  * Uses OAuth 2.0 and UGC (User Generated Content) Posts API
- * 
+ *
  * Requirements:
- * - OAuth scopes: r_liteprofile, r_organization_social, w_organization_social
- * - Posts to Company Pages (not personal profiles)
+ * - OAuth scopes: openid, profile, email, w_member_social
+ * - Posts to personal profiles only (company pages disabled until LinkedIn approval)
  * - Character limit: 3000 characters
  */
 
@@ -40,21 +40,21 @@ function isTokenExpired(expiresAt: string | null | undefined): boolean {
 }
 
 /**
- * Publish a text post to LinkedIn Company Page
- * 
- * @param args - PublishArgs object with accessToken, platformUserId, content, tokenExpiresAt
+ * Publish a text post to LinkedIn Personal Profile
+ *
+ * @param args - PublishArgs object with accessToken, platformUserId (person ID), content, tokenExpiresAt
  * @returns PublishResult with success status and post ID
  */
 export async function publishToLinkedIn(
   args: PublishArgs
 ): Promise<PublishResult> {
   // Extract inputs (IMMUTABLE - never reassign)
-  const { accessToken: encryptedToken, platformUserId: organizationId, content: rawContent, tokenExpiresAt } = args
+  const { accessToken: encryptedToken, platformUserId: personId, content: rawContent, tokenExpiresAt } = args
   
-  if (!organizationId) {
+  if (!personId) {
     return {
       success: false,
-      error: 'LinkedIn organization ID (platformUserId) is required',
+      error: 'LinkedIn person ID (platformUserId) is required',
     }
   }
   try {
@@ -76,9 +76,9 @@ export async function publishToLinkedIn(
       finalContent = rawContent.substring(0, 2997) + '...'
     }
 
-    // Build UGC post payload
+    // Build UGC post payload for personal profile
     const postPayload: LinkedInUGCPost = {
-      author: `urn:li:organization:${organizationId}`,
+      author: `urn:li:person:${personId}`,
       lifecycleState: 'PUBLISHED',
       specificContent: {
         'com.linkedin.ugc.ShareContent': {
@@ -120,7 +120,7 @@ export async function publishToLinkedIn(
       if (response.status === 403) {
         return {
           success: false,
-          error: 'LinkedIn permission denied. Check organization access and OAuth scopes.',
+          error: 'LinkedIn permission denied. Check OAuth scopes (w_member_social required).',
         }
       }
       
@@ -176,101 +176,20 @@ export async function getLinkedInMetrics(
 }
 
 /**
- * Validate LinkedIn connection by fetching organizations
- * Used during OAuth flow to verify token works
- * 
+ * Get LinkedIn organizations (DISABLED)
+ * Company page posting is disabled until LinkedIn approves organization access.
+ * This function is kept for backward compatibility but returns empty array.
+ *
  * @param accessToken - Raw (unencrypted) access token
- * @returns Array of organizations user can post to
+ * @returns Empty array (company pages disabled)
  */
 export async function getLinkedInOrganizations(accessToken: string): Promise<Array<{
   id: string
   name: string
 }>> {
-  try {
-    console.log('[LinkedIn] Fetching organizations with ADMINISTRATOR role...')
-    
-    // Use organizationalEntityAcls endpoint (OIDC-compatible)
-    const response = await fetch(
-      'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR',
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'X-Restli-Protocol-Version': '2.0.0',
-        },
-      }
-    )
-
-    console.log('[LinkedIn] Organizations API response status:', response.status)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[LinkedIn] Failed to fetch organizations')
-      console.error('[LinkedIn] Status:', response.status)
-      console.error('[LinkedIn] Response:', errorText)
-      throw new Error(`Failed to fetch organizations: ${response.status}`)
-    }
-
-    const data = await response.json()
-    console.log('[LinkedIn] Organizations response:', JSON.stringify(data, null, 2))
-    
-    // Parse organization data from LinkedIn's response
-    const organizations: Array<{ id: string; name: string }> = []
-    
-    if (data.elements && Array.isArray(data.elements)) {
-      for (const element of data.elements) {
-        // Extract organization target
-        const orgTarget = element.organizationalTarget
-        if (!orgTarget) continue
-        
-        // Extract organization ID from URN (e.g., "urn:li:organization:12345" -> "12345")
-        const orgId = orgTarget.split(':').pop()
-        if (!orgId) continue
-        
-        // Fetch organization details to get name
-        try {
-          const orgResponse = await fetch(
-            `https://api.linkedin.com/v2/organizations/${orgId}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'X-Restli-Protocol-Version': '2.0.0',
-              },
-            }
-          )
-          
-          if (orgResponse.ok) {
-            const orgData = await orgResponse.json()
-            const orgName = orgData.localizedName || orgData.name?.localized?.en_US || `Organization ${orgId}`
-            organizations.push({
-              id: orgId,
-              name: orgName,
-            })
-            console.log('[LinkedIn] ✓ Found organization:', orgName, `(ID: ${orgId})`)
-          } else {
-            // If we can't fetch details, still add with ID
-            organizations.push({
-              id: orgId,
-              name: `Organization ${orgId}`,
-            })
-            console.log('[LinkedIn] ⚠️  Added organization without name (ID: ${orgId})')
-          }
-        } catch (orgError) {
-          console.error('[LinkedIn] Failed to fetch org details for', orgId, orgError)
-          // Still add the organization
-          organizations.push({
-            id: orgId,
-            name: `Organization ${orgId}`,
-          })
-        }
-      }
-    }
-
-    console.log('[LinkedIn] Total organizations found:', organizations.length)
-    return organizations
-  } catch (error) {
-    console.error('[LinkedIn] Error fetching organizations:', error)
-    throw error
-  }
+  console.log('[LinkedIn] Company page fetching disabled - personal profile posting only')
+  console.log('[LinkedIn] Waiting for LinkedIn approval for organization access')
+  return []
 }
 
 

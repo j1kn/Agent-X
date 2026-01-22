@@ -6,14 +6,13 @@ export const runtime = 'nodejs'
 
 /**
  * LinkedIn OAuth 2.0 - Handle Authorization Callback
- * 
+ *
  * LinkedIn redirects here after user approves/denies access.
  * This endpoint:
  * 1. Validates state (CSRF protection)
  * 2. Exchanges authorization code for access token
- * 3. Fetches organizations user can post to
- * 4. Redirects to accounts page with organization list
- * 
+ * 3. Saves personal profile connection (company pages disabled until LinkedIn approval)
+ *
  * Required env vars:
  * - LINKEDIN_CLIENT_ID
  * - LINKEDIN_CLIENT_SECRET
@@ -198,26 +197,13 @@ export async function GET(request: Request) {
     console.log('[LinkedIn OAuth] ✓ Person ID (sub):', personId)
     console.log('[LinkedIn OAuth] ✓ Author URN:', authorUrn)
 
-    // STEP 7: Fetch company pages user can admin
-    console.log('[LinkedIn OAuth] ========== FETCHING COMPANY PAGES ==========')
+    // STEP 7: Company pages disabled until LinkedIn approves organization access
+    console.log('[LinkedIn OAuth] ========== COMPANY PAGES DISABLED ==========')
+    console.log('[LinkedIn OAuth] Company page posting disabled until LinkedIn approval')
+    console.log('[LinkedIn OAuth] Personal profile posting only')
     
-    let organizations: Array<{ id: string; name: string }> = []
-    try {
-      organizations = await getLinkedInOrganizations(access_token)
-      console.log('[LinkedIn OAuth] ✓ Found', organizations.length, 'company page(s)')
-      
-      if (organizations.length === 0) {
-        console.log('[LinkedIn OAuth] No company pages found - user can still post to personal feed')
-      } else {
-        organizations.forEach((org, i) => {
-          console.log(`[LinkedIn OAuth]   ${i + 1}. ${org.name} (ID: ${org.id})`)
-        })
-      }
-    } catch (orgError) {
-      console.error('[LinkedIn OAuth] ⚠️  Failed to fetch company pages:', orgError)
-      console.log('[LinkedIn OAuth] Continuing without company pages - user can post to personal feed')
-      // Don't fail the whole flow - user can still post to personal feed
-    }
+    // No longer fetching organizations - personal profile only
+    const organizations: Array<{ id: string; name: string }> = []
 
     // Encode data for frontend
     const orgData = Buffer.from(JSON.stringify({
@@ -230,7 +216,7 @@ export async function GET(request: Request) {
 
     console.log('[LinkedIn OAuth] ✓ Redirecting to accounts page')
     
-    // Redirect to accounts page with organization selection
+    // Redirect to accounts page with personal profile connection
     return NextResponse.redirect(
       new URL(`/accounts?linkedin_auth=success&data=${encodeURIComponent(orgData)}`, process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
     )

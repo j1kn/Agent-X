@@ -35,12 +35,11 @@ export default function AccountsPage() {
       router.replace('/accounts')
       fetchAccounts()
     } else if (linkedInAuth === 'success' && linkedInData) {
-      // LinkedIn OAuth callback - decode organization data
+      // LinkedIn OAuth callback - save personal profile connection directly
       try {
         const decoded = JSON.parse(Buffer.from(decodeURIComponent(linkedInData), 'base64').toString())
-        setLinkedInAuthData(decoded)
-        setLinkedInOrgs(decoded.organizations || [])
-        setShowLinkedInModal(true)
+        // Automatically save personal profile (no company page selection)
+        saveLinkedInProfile(decoded)
         // Clean URL
         router.replace('/accounts')
       } catch (err) {
@@ -153,7 +152,7 @@ export default function AccountsPage() {
     window.location.href = '/api/accounts/linkedin/connect'
   }
 
-  const handleLinkedInOrgSelect = async (orgId: string, orgName: string) => {
+  const saveLinkedInProfile = async (authData: any) => {
     setConnecting(true)
     setError(null)
 
@@ -164,10 +163,10 @@ export default function AccountsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          access_token: linkedInAuthData.access_token,
-          expires_in: linkedInAuthData.expires_in,
-          organization_id: orgId,
-          organization_name: orgName,
+          access_token: authData.access_token,
+          expires_in: authData.expires_in,
+          person_id: authData.person_id,
+          author_urn: authData.author_urn,
         }),
       })
 
@@ -176,10 +175,7 @@ export default function AccountsPage() {
       if (data.error) {
         setError(data.error)
       } else if (data.success) {
-        setSuccess(`LinkedIn Company Page "${orgName}" connected successfully!`)
-        setShowLinkedInModal(false)
-        setLinkedInAuthData(null)
-        setLinkedInOrgs([])
+        setSuccess('LinkedIn personal profile connected successfully!')
         fetchAccounts()
       }
     } catch (error) {
@@ -271,7 +267,7 @@ export default function AccountsPage() {
             disabled={connecting}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50"
           >
-            Connect LinkedIn Company Page
+            Connect LinkedIn (Personal)
           </button>
         </div>
       </div>
@@ -292,7 +288,7 @@ export default function AccountsPage() {
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
                       {account.platform === 'telegram' && 'Telegram'}
                       {account.platform === 'x' && 'X (Twitter)'}
-                      {account.platform === 'linkedin' && 'LinkedIn Company Page'}
+                      {account.platform === 'linkedin' && 'LinkedIn'}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {account.platform === 'linkedin' ? account.username : `@${account.username}`}
@@ -485,48 +481,7 @@ export default function AccountsPage() {
         </div>
       )}
 
-      {/* LinkedIn Organization Selection Modal */}
-      {showLinkedInModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              Select LinkedIn Company Page
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Choose which Company Page you want to connect for posting:
-            </p>
-            
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {linkedInOrgs.map((org: any) => (
-                <button
-                  key={org.id}
-                  onClick={() => handleLinkedInOrgSelect(org.id, org.name)}
-                  disabled={connecting}
-                  className="w-full text-left px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
-                >
-                  <p className="font-medium text-gray-900 dark:text-white">{org.name}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">ID: {org.id}</p>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowLinkedInModal(false)
-                  setLinkedInOrgs([])
-                  setLinkedInAuthData(null)
-                }}
-                disabled={connecting}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* LinkedIn modal removed - personal profile connection is automatic */}
     </div>
   )
 }

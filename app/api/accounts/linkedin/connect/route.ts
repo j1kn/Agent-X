@@ -82,13 +82,13 @@ export async function GET() {
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('state', state)
-  // PATH A: OpenID Connect - COMPLETE REQUIRED SCOPES
+  // Personal LinkedIn posting only (until LinkedIn approves organization access)
   // openid = REQUIRED for OIDC
   // profile = REQUIRED identity scope for OIDC
   // email = REQUIRED identity scope for OIDC
   // w_member_social = REQUIRED for posting to personal feed
-  // rw_organization_admin = REQUIRED for fetching and managing company pages
-  authUrl.searchParams.set('scope', 'openid profile email w_member_social rw_organization_admin')
+  // NOTE: rw_organization_admin removed - company page posting disabled until LinkedIn approval
+  authUrl.searchParams.set('scope', 'openid profile email w_member_social')
 
   const finalUrl = authUrl.toString()
   
