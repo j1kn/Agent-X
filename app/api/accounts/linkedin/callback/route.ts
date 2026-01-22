@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getLinkedInOrganizations } from '@/lib/platforms/linkedin'
 import { encrypt } from '@/lib/crypto/encryption'
@@ -20,7 +20,10 @@ export const runtime = 'nodejs'
  * - LINKEDIN_REDIRECT_URI
  */
 export async function GET(request: Request) {
+  // Use regular client for auth operations
   const supabase = await createClient()
+  // Use service client for database writes (bypasses RLS)
+  const supabaseAdmin = createServiceClient()
   
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
@@ -226,9 +229,9 @@ export async function GET(request: Request) {
     console.log('[LinkedIn OAuth] Author URN:', authorUrn)
     
     // Save to connected_accounts table (ATOMIC OPERATION)
-    const { data: insertedAccount, error: dbError } = await supabase
+    // Using service client to bypass RLS
+    const { data: insertedAccount, error: dbError } = await supabaseAdmin
       .from('connected_accounts')
-      // @ts-expect-error - Supabase upsert type inference issue
       .upsert({
         user_id: user.id,
         platform: 'linkedin',
@@ -246,14 +249,18 @@ export async function GET(request: Request) {
     if (dbError) {
       console.error('[LinkedIn OAuth] ❌ DATABASE INSERT FAILED')
       console.error('[LinkedIn OAuth] Error:', dbError)
+      console.error('[LinkedIn OAuth] Error details:', JSON.stringify(dbError, null, 2))
       return NextResponse.redirect(
         new URL(`/accounts?error=${encodeURIComponent('Failed to save LinkedIn connection: ' + dbError.message)}`, process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
       )
     }
     
+    console.log('[LinkedIn OAuth] ✓ Database insert successful')
+    console.log('[LinkedIn OAuth] Inserted account:', insertedAccount)
+    
     // VERIFY the record was actually saved (CRITICAL)
     console.log('[LinkedIn OAuth] Verifying database write...')
-    const { data: verifyAccount, error: verifyError } = await supabase
+    const { data: verifyAccount, error: verifyError } = await supabaseAdmin
       .from('connected_accounts')
       .select('id, platform, username, is_active')
       .eq('user_id', user.id)
