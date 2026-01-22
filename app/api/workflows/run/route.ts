@@ -293,6 +293,26 @@ export async function POST() {
             continue
           }
           
+          // LinkedIn rate limiting: Max 1 post per 24 hours
+          if (platform === 'linkedin') {
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+            const { data: recentLinkedInPosts } = await supabase
+              .from('posts')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('platform', 'linkedin')
+              .eq('status', 'published')
+              .gte('published_at', twentyFourHoursAgo)
+              .limit(1)
+            
+            if (recentLinkedInPosts && recentLinkedInPosts.length > 0) {
+              console.log(`[LinkedIn] Rate limit: Already posted to LinkedIn in last 24 hours. Skipping.`)
+              await logPipeline(supabase, user.id, 'publishing', 'warning',
+                'LinkedIn rate limit: Max 1 post per 24 hours. Skipping LinkedIn.')
+              continue
+            }
+          }
+          
           console.log(`Publishing to ${platform} (${account.username})...`)
           
           try {

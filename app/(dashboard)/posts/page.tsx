@@ -86,7 +86,13 @@ export default function PostsPage() {
                         {post.status}
                       </span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {post.connected_accounts?.platform}
+                        {post.connected_accounts?.platform === 'linkedin'
+                          ? '💼 LinkedIn · Personal Profile'
+                          : post.connected_accounts?.platform === 'x'
+                          ? '𝕏 X (Twitter)'
+                          : post.connected_accounts?.platform === 'telegram'
+                          ? '✈️ Telegram'
+                          : post.connected_accounts?.platform}
                       </span>
                       {post.image_url && (
                         <span className="px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-800">
