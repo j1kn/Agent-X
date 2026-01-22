@@ -8,6 +8,7 @@
 export interface PlatformVariants {
   x: string
   telegram: string
+  linkedin: string
 }
 
 /**
@@ -17,6 +18,7 @@ export function createPlatformVariants(masterContent: string): PlatformVariants 
   return {
     x: optimizeForX(masterContent),
     telegram: optimizeForTelegram(masterContent),
+    linkedin: optimizeForLinkedIn(masterContent),
   }
 }
 
@@ -80,12 +82,12 @@ function optimizeForTelegram(content: string): string {
 }
 
 /**
- * LinkedIn Optimization (if needed in future)
+ * LinkedIn Optimization
  * - Professional tone
  * - Up to 3000 characters
  * - Hashtags encouraged
  */
-export function optimizeForLinkedIn(content: string): string {
+function optimizeForLinkedIn(content: string): string {
   let linkedInContent = content
 
   // Remove casual emojis, keep professional ones

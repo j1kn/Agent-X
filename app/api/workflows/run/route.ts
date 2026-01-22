@@ -3,7 +3,7 @@
  *
  * Called by Supabase cron every 5 minutes.
  * Checks if current time matches any user's scheduled posting time,
- * generates content, and publishes immediately to X + Telegram.
+ * generates content, and publishes immediately to X, Telegram, and LinkedIn.
  *
  * Key features:
  * - Respects user timezone
@@ -19,6 +19,7 @@ import { checkTimeMatch, logPipeline, extractRecentTopics, shouldGenerateImageFo
 import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
+import { publishToLinkedIn } from '@/lib/platforms/linkedin'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
 import { generateImageWithStability } from '@/lib/ai/providers/stability-image'
 import { uploadImageToStorage } from '@/lib/storage/image-upload'
@@ -136,18 +137,18 @@ export async function POST() {
         
         console.log(`✓ No duplicate found for time slot: ${timeSlot}`)
         
-        // Get connected accounts (X and Telegram only)
+        // Get connected accounts (X, Telegram, and LinkedIn)
         const { data: accountsData } = await supabase
           .from('connected_accounts')
           .select('id, platform, access_token, platform_user_id, username, token_expires_at')
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .in('platform', ['x', 'telegram'])
+          .in('platform', ['x', 'telegram', 'linkedin'])
         
         const accounts = accountsData as ConnectedAccount[] | null
         
         if (!accounts || accounts.length === 0) {
-          console.log('No active X or Telegram accounts')
+          console.log('No active accounts (X, Telegram, or LinkedIn)')
           await logPipeline(supabase, user.id, 'publishing', 'warning', 'No active accounts')
           results.push({ userId: user.id, status: 'skipped', error: 'No accounts connected' })
           continue
@@ -278,7 +279,19 @@ export async function POST() {
         
         for (const account of accounts) {
           const platform = account.platform
-          const content = platform === 'x' ? variants.x : variants.telegram
+          let content: string
+          
+          // Select appropriate content variant for platform
+          if (platform === 'x') {
+            content = variants.x
+          } else if (platform === 'telegram') {
+            content = variants.telegram
+          } else if (platform === 'linkedin') {
+            content = variants.linkedin
+          } else {
+            console.log(`Unsupported platform: ${platform}`)
+            continue
+          }
           
           console.log(`Publishing to ${platform} (${account.username})...`)
           
@@ -314,6 +327,8 @@ export async function POST() {
                 ...publishArgs,
                 platformUserId: account.platform_user_id,
               })
+            } else if (platform === 'linkedin') {
+              publishResult = await publishToLinkedIn(publishArgs)
             } else {
               continue // Skip unsupported platforms
             }
