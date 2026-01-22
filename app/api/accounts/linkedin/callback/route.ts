@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getLinkedInOrganizations } from '@/lib/platforms/linkedin'
+import { encrypt } from '@/lib/crypto/encryption'
 
 export const runtime = 'nodejs'
 
@@ -197,28 +198,85 @@ export async function GET(request: Request) {
     console.log('[LinkedIn OAuth] ✓ Person ID (sub):', personId)
     console.log('[LinkedIn OAuth] ✓ Author URN:', authorUrn)
 
-    // STEP 7: Company pages disabled until LinkedIn approves organization access
-    console.log('[LinkedIn OAuth] ========== COMPANY PAGES DISABLED ==========')
-    console.log('[LinkedIn OAuth] Company page posting disabled until LinkedIn approval')
-    console.log('[LinkedIn OAuth] Personal profile posting only')
+    // STEP 7: Save LinkedIn connection directly to database (ATOMIC)
+    console.log('[LinkedIn OAuth] ========== SAVING TO DATABASE ==========')
+    console.log('[LinkedIn OAuth] Personal profile posting only (company pages disabled)')
     
-    // No longer fetching organizations - personal profile only
-    const organizations: Array<{ id: string; name: string }> = []
-
-    // Encode data for frontend
-    const orgData = Buffer.from(JSON.stringify({
-      access_token,
-      expires_in,
-      author_urn: authorUrn,
-      person_id: personId,
-      organizations,
-    })).toString('base64')
-
-    console.log('[LinkedIn OAuth] ✓ Redirecting to accounts page')
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser()
     
-    // Redirect to accounts page with personal profile connection
+    if (!user) {
+      console.error('[LinkedIn OAuth] User not found after OAuth')
+      return NextResponse.redirect(
+        new URL('/accounts?error=User session lost', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+      )
+    }
+    
+    // Encrypt the access token
+    const encryptedToken = encrypt(access_token)
+    
+    // Calculate token expiration
+    const expiresAt = expires_in
+      ? new Date(Date.now() + expires_in * 1000).toISOString()
+      : null
+    
+    console.log('[LinkedIn OAuth] Saving to connected_accounts table...')
+    console.log('[LinkedIn OAuth] User ID:', user.id)
+    console.log('[LinkedIn OAuth] Person ID:', personId)
+    console.log('[LinkedIn OAuth] Author URN:', authorUrn)
+    
+    // Save to connected_accounts table (ATOMIC OPERATION)
+    const { data: insertedAccount, error: dbError } = await supabase
+      .from('connected_accounts')
+      // @ts-expect-error - Supabase upsert type inference issue
+      .upsert({
+        user_id: user.id,
+        platform: 'linkedin',
+        platform_user_id: personId,
+        access_token: encryptedToken,
+        token_expires_at: expiresAt,
+        username: 'Personal Profile',
+        is_active: true,
+      }, {
+        onConflict: 'user_id,platform',
+      })
+      .select()
+      .single()
+    
+    if (dbError) {
+      console.error('[LinkedIn OAuth] ❌ DATABASE INSERT FAILED')
+      console.error('[LinkedIn OAuth] Error:', dbError)
+      return NextResponse.redirect(
+        new URL(`/accounts?error=${encodeURIComponent('Failed to save LinkedIn connection: ' + dbError.message)}`, process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+      )
+    }
+    
+    // VERIFY the record was actually saved (CRITICAL)
+    console.log('[LinkedIn OAuth] Verifying database write...')
+    const { data: verifyAccount, error: verifyError } = await supabase
+      .from('connected_accounts')
+      .select('id, platform, username, is_active')
+      .eq('user_id', user.id)
+      .eq('platform', 'linkedin')
+      .single()
+    
+    if (verifyError || !verifyAccount) {
+      console.error('[LinkedIn OAuth] ❌ VERIFICATION FAILED')
+      console.error('[LinkedIn OAuth] Verify error:', verifyError)
+      return NextResponse.redirect(
+        new URL('/accounts?error=LinkedIn connection could not be verified', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+      )
+    }
+    
+    console.log('[LinkedIn OAuth] ✓ DATABASE WRITE VERIFIED')
+    console.log('[LinkedIn OAuth] Account ID:', (verifyAccount as any).id)
+    console.log('[LinkedIn OAuth] Platform:', (verifyAccount as any).platform)
+    console.log('[LinkedIn OAuth] Username:', (verifyAccount as any).username)
+    console.log('[LinkedIn OAuth] Active:', (verifyAccount as any).is_active)
+    
+    // SUCCESS - Redirect with success message
     return NextResponse.redirect(
-      new URL(`/accounts?linkedin_auth=success&data=${encodeURIComponent(orgData)}`, process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+      new URL('/accounts?success=linkedin_connected', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
     )
 
   } catch (error) {

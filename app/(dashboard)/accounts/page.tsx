@@ -26,26 +26,19 @@ export default function AccountsPage() {
     // Check for success/error params from OAuth redirect
     const successParam = searchParams.get('success')
     const errorParam = searchParams.get('error')
-    const linkedInAuth = searchParams.get('linkedin_auth')
-    const linkedInData = searchParams.get('data')
     
     if (successParam === 'x_connected') {
       setSuccess('X account connected successfully!')
       // Clean URL
       router.replace('/accounts')
       fetchAccounts()
-    } else if (linkedInAuth === 'success' && linkedInData) {
-      // LinkedIn OAuth callback - save personal profile connection directly
-      try {
-        const decoded = JSON.parse(Buffer.from(decodeURIComponent(linkedInData), 'base64').toString())
-        // Automatically save personal profile (no company page selection)
-        saveLinkedInProfile(decoded)
-        // Clean URL
-        router.replace('/accounts')
-      } catch (err) {
-        setError('Failed to process LinkedIn connection')
-        router.replace('/accounts')
-      }
+    } else if (successParam === 'linkedin_connected') {
+      // LinkedIn OAuth callback - connection already saved to database
+      setSuccess('LinkedIn personal profile connected successfully!')
+      // Clean URL
+      router.replace('/accounts')
+      // Refresh accounts list from database (source of truth)
+      fetchAccounts()
     } else if (errorParam) {
       setError(`Connection failed: ${errorParam}`)
       router.replace('/accounts')
@@ -149,41 +142,8 @@ export default function AccountsPage() {
 
   const handleConnectLinkedIn = () => {
     // Redirect to LinkedIn OAuth flow
+    // Connection will be saved atomically in the callback
     window.location.href = '/api/accounts/linkedin/connect'
-  }
-
-  const saveLinkedInProfile = async (authData: any) => {
-    setConnecting(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/accounts/linkedin/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_token: authData.access_token,
-          expires_in: authData.expires_in,
-          person_id: authData.person_id,
-          author_urn: authData.author_urn,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.error) {
-        setError(data.error)
-      } else if (data.success) {
-        setSuccess('LinkedIn personal profile connected successfully!')
-        fetchAccounts()
-      }
-    } catch (error) {
-      console.error('Failed to save LinkedIn connection:', error)
-      setError('Failed to save LinkedIn connection')
-    } finally {
-      setConnecting(false)
-    }
   }
 
   const handleDisconnect = async (accountId: string) => {
