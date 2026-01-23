@@ -96,13 +96,13 @@ export async function generatePost(
     }
   }
 
-  // 7. Get connected accounts for X and Telegram
+  // 7. Get connected accounts for X, Telegram, and LinkedIn
   const { data: accountsData, error: accountsError } = await supabase
     .from('connected_accounts')
     .select('id, platform')
     .eq('user_id', userId)
     .eq('is_active', true)
-    .in('platform', ['x', 'telegram'])
+    .in('platform', ['x', 'telegram', 'linkedin'])
 
   if (accountsError) {
     throw new Error(`Failed to fetch accounts: ${accountsError.message}`)
@@ -112,7 +112,7 @@ export async function generatePost(
   const accounts = (accountsData || []) as ConnectedAccount[]
 
   if (accounts.length === 0) {
-    throw new Error('No active X or Telegram accounts connected')
+    throw new Error('No active X, Telegram, or LinkedIn accounts connected')
   }
 
   // 8. Create posts for each connected account
@@ -120,7 +120,9 @@ export async function generatePost(
   
   for (const account of accounts) {
     const platform = account.platform
-    const content = platform === 'x' ? variants.x : variants.telegram
+    const content = platform === 'x' ? variants.x :
+                   platform === 'telegram' ? variants.telegram :
+                   variants.linkedin
 
     // Validate content for platform
     const validation = validatePostContent(content, platform)
