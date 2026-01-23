@@ -197,8 +197,17 @@ export async function GET(request: Request) {
       throw new Error('No person ID (sub) in LinkedIn userinfo response')
     }
 
+    // Extract profile information
+    const fullName = userinfoData.name || 'LinkedIn User'
+    const email = userinfoData.email || null
+    const profilePicture = userinfoData.picture || null
+    const emailVerified = userinfoData.email_verified || false
+
     const authorUrn = `urn:li:person:${personId}`
     console.log('[LinkedIn OAuth] ✓ Person ID (sub):', personId)
+    console.log('[LinkedIn OAuth] ✓ Full Name:', fullName)
+    console.log('[LinkedIn OAuth] ✓ Email:', email)
+    console.log('[LinkedIn OAuth] ✓ Profile Picture:', profilePicture ? 'Yes' : 'No')
     console.log('[LinkedIn OAuth] ✓ Author URN:', authorUrn)
 
     // STEP 7: Save LinkedIn connection directly to database (ATOMIC)
@@ -238,7 +247,7 @@ export async function GET(request: Request) {
         platform_user_id: personId,
         access_token: encryptedToken,
         token_expires_at: expiresAt,
-        username: 'Personal Profile',
+        username: fullName,
         is_active: true,
       }, {
         onConflict: 'user_id,platform',

@@ -5,6 +5,7 @@ import { selectNextTopic } from '@/lib/autopilot/topicSelector'
 import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
+import { publishToLinkedIn } from '@/lib/platforms/linkedin'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
 import { checkTimeMatch, logPipeline, extractRecentTopics, shouldGenerateImageForTime, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
 import { generateImageWithStability } from '@/lib/ai/providers/stability-image'
@@ -198,18 +199,18 @@ async function autoGenerateAndPublish(): Promise<{
         
         console.log(`[Auto-Gen] ✓ No duplicate found for time slot: ${timeSlot}`)
         
-        // Get connected accounts (X and Telegram only)
+        // Get connected accounts (X, Telegram, and LinkedIn)
         const { data: accountsData } = await supabase
           .from('connected_accounts')
           .select('id, platform, access_token, platform_user_id, username, token_expires_at')
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .in('platform', ['x', 'telegram'])
+          .in('platform', ['x', 'telegram', 'linkedin'])
         
         const accounts = accountsData as ConnectedAccount[] | null
         
         if (!accounts || accounts.length === 0) {
-          console.log('[Auto-Gen] No active X or Telegram accounts')
+          console.log('[Auto-Gen] No active X, Telegram, or LinkedIn accounts')
           await logPipeline(supabase, user.id, 'publishing', 'warning', 'No active accounts')
           results.push({ userId: user.id, status: 'skipped', error: 'No accounts connected' })
           continue
@@ -335,7 +336,9 @@ async function autoGenerateAndPublish(): Promise<{
         
         for (const account of accounts) {
           const platform = account.platform
-          const content = platform === 'x' ? variants.x : variants.telegram
+          const content = platform === 'x' ? variants.x :
+                         platform === 'telegram' ? variants.telegram :
+                         variants.linkedin
           
           console.log(`[Auto-Gen] Publishing to ${platform} (${account.username})...`)
           
@@ -366,6 +369,8 @@ async function autoGenerateAndPublish(): Promise<{
                 ...publishArgs,
                 platformUserId: account.platform_user_id,
               })
+            } else if (platform === 'linkedin') {
+              publishResult = await publishToLinkedIn(publishArgs)
             } else {
               continue // Skip unsupported platforms
             }
