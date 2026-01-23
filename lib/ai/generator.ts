@@ -165,7 +165,12 @@ function buildPrompt(options: GenerateOptions, trainingInstructions?: string): s
     prompt += `\n\nRecent posts (avoid repetition):\n${recentPosts.join('\n')}`
   }
 
-  prompt += '\n\nGenerate only the post content, no explanations or meta-commentary. Keep it concise and engaging (under 280 characters for X/Twitter compatibility).'
+  prompt += '\n\nGenerate only the post content, no explanations or meta-commentary. Keep it concise and engaging.'
+  prompt += '\n\nIMPORTANT: This content will be adapted for multiple platforms:'
+  prompt += '\n- X/Twitter (280 character limit)'
+  prompt += '\n- Telegram (4096 character limit)'
+  prompt += '\n- LinkedIn (3000 character limit, professional tone)'
+  prompt += '\n\nCreate content that works well when shortened for X but can also be expanded for LinkedIn. Aim for 200-500 characters as a good middle ground.'
 
   return prompt
 }
