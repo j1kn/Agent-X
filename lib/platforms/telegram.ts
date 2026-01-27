@@ -141,18 +141,102 @@ export async function publishToTelegram(
 
 export async function getTelegramMetrics(
   accessToken: string,
-  channelUsername: string,
+  chatId: string,
   messageId: string
 ): Promise<EngagementMetrics> {
-  // Telegram doesn't provide public API for view counts on channels
-  // This would require Telegram Premium API or MTProto
-  // For now, return zero metrics
-  // In production, you'd need to implement MTProto client or use Telegram's premium API
+  try {
+    // Telegram Bot API doesn't provide detailed metrics for channel posts
+    // However, we can use getChat and potentially other methods
+    // For channels, we need to use the channel's numeric ID (negative for channels)
+    
+    console.log('[Telegram Metrics] Fetching metrics for message:', { chatId, messageId })
+    
+    // Note: Telegram Bot API has limited metrics access
+    // Views, forwards, and reactions require either:
+    // 1. Channel admin rights
+    // 2. MTProto API (not Bot API)
+    // 3. Telegram Premium API
+    
+    // For production use, you would need to implement one of these approaches
+    // For now, we'll return placeholder metrics that can be populated
+    // when proper API access is configured
+    
+    return {
+      likes: 0, // Telegram channels don't have traditional likes
+      retweets: 0, // Will be mapped to forwards
+      views: 0, // Requires admin access or MTProto
+    }
+  } catch (error) {
+    console.error('[Telegram Metrics] Error fetching metrics:', error)
+    return {
+      likes: 0,
+      retweets: 0,
+      views: 0,
+    }
+  }
+}
 
-  return {
-    likes: 0, // Telegram channels don't have likes
-    retweets: 0, // Telegram has forwards, but not accessible via Bot API
-    views: 0, // Would need MTProto for view counts
+// Enhanced metrics fetcher for Telegram with proper structure
+export async function fetchTelegramPostMetrics(
+  accessToken: string,
+  chatId: string,
+  messageId: string
+): Promise<{
+  views: number
+  forwards: number
+  reactions: number
+  comments: number
+}> {
+  try {
+    console.log('[Telegram] Fetching detailed metrics for:', { chatId, messageId })
+    
+    // Attempt to get message statistics
+    // Note: This requires the bot to be an admin in the channel
+    const url = `https://api.telegram.org/bot${accessToken}/getChat`
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+      }),
+    })
+    
+    const data = await response.json()
+    
+    if (!response.ok || !data.ok) {
+      console.warn('[Telegram] Could not fetch chat info:', data.description)
+      // Return zeros if we can't fetch metrics
+      return {
+        views: 0,
+        forwards: 0,
+        reactions: 0,
+        comments: 0,
+      }
+    }
+    
+    // For now, return placeholder values
+    // In production, you would:
+    // 1. Use MTProto to get actual view counts
+    // 2. Track reactions via updates
+    // 3. Count replies/comments via message threads
+    
+    return {
+      views: 0,
+      forwards: 0,
+      reactions: 0,
+      comments: 0,
+    }
+  } catch (error) {
+    console.error('[Telegram] Error fetching post metrics:', error)
+    return {
+      views: 0,
+      forwards: 0,
+      reactions: 0,
+      comments: 0,
+    }
   }
 }
 

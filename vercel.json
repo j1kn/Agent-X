@@ -1,4 +1,9 @@
 {
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/metrics/collect",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }
 

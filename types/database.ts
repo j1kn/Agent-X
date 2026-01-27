@@ -190,9 +190,14 @@ export interface Database {
           id: string
           post_id: string
           platform_post_id: string
+          platform: 'telegram' | 'x' | 'linkedin'
           likes: number
           retweets: number
           views: number
+          forwards: number
+          reactions: number
+          comments: number
+          engagement_score: number
           collected_at: string
           created_at: string
           updated_at: string
@@ -201,9 +206,14 @@ export interface Database {
           id?: string
           post_id: string
           platform_post_id: string
+          platform?: 'telegram' | 'x' | 'linkedin'
           likes?: number
           retweets?: number
           views?: number
+          forwards?: number
+          reactions?: number
+          comments?: number
+          engagement_score?: number
           collected_at?: string
           created_at?: string
           updated_at?: string
@@ -212,9 +222,14 @@ export interface Database {
           id?: string
           post_id?: string
           platform_post_id?: string
+          platform?: 'telegram' | 'x' | 'linkedin'
           likes?: number
           retweets?: number
           views?: number
+          forwards?: number
+          reactions?: number
+          comments?: number
+          engagement_score?: number
           collected_at?: string
           created_at?: string
           updated_at?: string
