@@ -49,7 +49,7 @@ async function testCronImageGeneration() {
   console.log()
   
   // Check current time match
-  const matchResult = checkTimeMatch(schedule)
+  const matchResult = checkTimeMatch(schedule as any)
   console.log('Current Time Check:')
   console.log('  Current Time:', matchResult.currentTime)
   console.log('  Matches Schedule:', matchResult.matches)
@@ -59,7 +59,7 @@ async function testCronImageGeneration() {
   console.log()
   
   // Check if image should be generated
-  const shouldGenImage = shouldGenerateImageForTime(schedule, matchResult.matchedTime)
+  const shouldGenImage = shouldGenerateImageForTime(schedule as any, matchResult.matchedTime)
   console.log('Image Generation Decision:')
   console.log('  Should Generate Image:', shouldGenImage)
   console.log()
