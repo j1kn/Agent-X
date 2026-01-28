@@ -14,29 +14,51 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '20')
+  const offset = (page - 1) * limit
 
+  // Optimized query - only fetch fields needed for list view
   let query = supabase
     .from('posts')
     .select(`
-      *,
-      connected_accounts (
-        platform,
-        username
+      id,
+      status,
+      content,
+      topic,
+      scheduled_for,
+      published_at,
+      created_at,
+      image_url,
+      generation_model,
+      connected_accounts!inner (
+        platform
       )
-    `)
+    `, { count: 'exact' })
     .eq('user_id', user.id)
 
   if (status) {
     query = query.eq('status', status)
   }
 
-  const { data: posts, error } = await query.order('created_at', { ascending: false })
+  const { data: posts, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ posts })
+  return NextResponse.json({
+    posts,
+    pagination: {
+      page,
+      limit,
+      total: count || 0,
+      totalPages: Math.ceil((count || 0) / limit),
+      hasMore: offset + limit < (count || 0)
+    }
+  })
 }
 
 

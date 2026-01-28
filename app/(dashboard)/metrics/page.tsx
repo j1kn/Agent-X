@@ -26,17 +26,36 @@ export default function MetricsPage() {
   const [metrics, setMetrics] = useState<PostMetric[]>([])
   const [loading, setLoading] = useState(true)
   const [collecting, setCollecting] = useState(false)
+  const [aggregates, setAggregates] = useState<any>(null)
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({
+    total: 0,
+    totalPages: 0,
+    hasMore: false
+  })
 
   useEffect(() => {
     fetchMetrics()
-  }, [])
+    fetchAggregates()
+  }, [page])
+
+  const fetchAggregates = async () => {
+    try {
+      const response = await fetch('/api/metrics?aggregate=true&platform=telegram')
+      const data = await response.json()
+      setAggregates(data.aggregates || null)
+    } catch (error) {
+      console.error('Failed to fetch aggregates:', error)
+    }
+  }
 
   const fetchMetrics = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/metrics')
+      const response = await fetch(`/api/metrics?platform=telegram&page=${page}&limit=20`)
       const data = await response.json()
       setMetrics(data.metrics || [])
+      setPagination(data.pagination || { total: 0, totalPages: 0, hasMore: false })
     } catch (error) {
       console.error('Failed to fetch metrics:', error)
     } finally {
@@ -54,8 +73,9 @@ export default function MetricsPage() {
       
       if (data.success) {
         alert(`Metrics collected successfully! ${data.collected} posts updated.`)
-        // Refresh metrics
+        // Refresh metrics and aggregates
         await fetchMetrics()
+        await fetchAggregates()
       } else {
         alert(`Failed to collect metrics: ${data.error || 'Unknown error'}`)
       }
@@ -67,7 +87,7 @@ export default function MetricsPage() {
     }
   }
 
-  if (loading) {
+  if (loading && !aggregates) {
     return (
       <div className="px-4 py-6 sm:px-0">
         <div className="text-gray-900 dark:text-white">Loading metrics...</div>
@@ -75,24 +95,13 @@ export default function MetricsPage() {
     )
   }
 
-  // Filter Telegram metrics
-  const telegramMetrics = metrics.filter(m => m.platform === 'telegram')
-  
-  // Calculate aggregate stats for Telegram
-  const totalPosts = telegramMetrics.length
-  const totalViews = telegramMetrics.reduce((sum, m) => sum + (m.views || 0), 0)
-  const totalForwards = telegramMetrics.reduce((sum, m) => sum + (m.forwards || 0), 0)
-  const totalReactions = telegramMetrics.reduce((sum, m) => sum + (m.reactions || 0), 0)
-  const avgEngagement = totalPosts > 0 
-    ? (telegramMetrics.reduce((sum, m) => sum + (m.engagement_score || 0), 0) / totalPosts).toFixed(1)
-    : 0
-  
-  // Find best performing post
-  const bestPost = telegramMetrics.length > 0
-    ? telegramMetrics.reduce((best, current) => 
-        (current.engagement_score || 0) > (best.engagement_score || 0) ? current : best
-      )
-    : null
+  // Use server-side aggregates
+  const totalPosts = aggregates?.total_posts || 0
+  const totalViews = aggregates?.total_views || 0
+  const totalForwards = aggregates?.total_forwards || 0
+  const totalReactions = aggregates?.total_reactions || 0
+  const avgEngagement = aggregates?.avg_engagement?.toFixed(1) || '0'
+  const bestScore = aggregates?.best_score?.toFixed(1) || '0'
 
   return (
     <div className="px-4 py-6 sm:px-0">
@@ -150,7 +159,7 @@ export default function MetricsPage() {
               Best Post Score
             </dt>
             <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-              {bestPost ? bestPost.engagement_score.toFixed(1) : '0'}
+              {bestScore}
             </dd>
           </div>
         </div>
@@ -203,7 +212,7 @@ export default function MetricsPage() {
           </p>
         </div>
         
-        {telegramMetrics.length === 0 ? (
+        {metrics.length === 0 ? (
           <div className="px-4 py-8 sm:px-6 text-center">
             <p className="text-sm text-gray-500 dark:text-gray-400">
               No Telegram metrics available yet.
@@ -213,37 +222,37 @@ export default function MetricsPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Post ID
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Views
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Reactions
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Forwards
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Comments
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Engagement Score
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Collected At
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {telegramMetrics
-                  .sort((a, b) => (b.engagement_score || 0) - (a.engagement_score || 0))
-                  .map((metric) => (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Post ID
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Views
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Reactions
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Forwards
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Comments
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Engagement Score
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Collected At
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {metrics.map((metric: PostMetric) => (
                     <tr key={metric.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                         {metric.post_id.substring(0, 8)}...
@@ -268,9 +277,78 @@ export default function MetricsPage() {
                       </td>
                     </tr>
                   ))}
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card Layout */}
+            <div className="md:hidden px-4 py-4 space-y-3">
+              {metrics.map((metric: PostMetric) => (
+                <div key={metric.id} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 shadow">
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      Post {metric.post_id.substring(0, 8)}...
+                    </span>
+                    <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                      {metric.engagement_score.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Views:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                        {metric.views.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Reactions:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                        {metric.reactions}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Forwards:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                        {metric.forwards}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Comments:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                        {metric.comments}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                    {new Date(metric.collected_at).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Page {page} of {pagination.totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={!pagination.hasMore}
+                  className="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

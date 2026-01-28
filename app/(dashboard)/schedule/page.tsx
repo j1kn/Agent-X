@@ -351,7 +351,7 @@ export default function SchedulePage() {
                     </button>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3">
                     {/* LinkedIn */}
                     <label className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-gray-800 transition-colors">
                       <input
