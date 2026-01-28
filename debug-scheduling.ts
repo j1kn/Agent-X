@@ -70,7 +70,7 @@ async function debugScheduling() {
     
     // Check current time match
     console.log('\nTime Match Check:')
-    const matchResult = checkTimeMatch(scheduleData)
+    const matchResult = checkTimeMatch(scheduleData as any)
     console.log(`  Current Time (${scheduleData.timezone}): ${matchResult.currentTime}`)
     console.log(`  Time Slot: ${matchResult.timeSlot}`)
     console.log(`  Matches Schedule: ${matchResult.matches ? '✓ YES' : '✗ NO'}`)
