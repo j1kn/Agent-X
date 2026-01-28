@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 
+type Platform = 'linkedin' | 'x' | 'telegram'
+
 const DAYS_OF_WEEK = [
   { id: 'monday', label: 'Monday' },
   { id: 'tuesday', label: 'Tuesday' },
@@ -21,6 +23,7 @@ export default function SchedulePage() {
   const [success, setSuccess] = useState(false)
   const [imageGenerationEnabled, setImageGenerationEnabled] = useState(false)
   const [imageTimes, setImageTimes] = useState<string[]>([])
+  const [platformPreferences, setPlatformPreferences] = useState<{[key: string]: Platform[]}>({})
 
   useEffect(() => {
     fetchSchedule()
@@ -37,6 +40,15 @@ export default function SchedulePage() {
         setFrequency(data.schedule.frequency || 'daily')
         setImageGenerationEnabled(data.schedule.image_generation_enabled || false)
         setImageTimes(data.schedule.image_times || [])
+        
+        // Load platform preferences or default to all platforms
+        const prefs = data.schedule.platform_preferences as {[key: string]: Platform[]} || {}
+        const defaultPrefs: {[key: string]: Platform[]} = {}
+        const scheduleTimes = data.schedule.times || ['09:00']
+        scheduleTimes.forEach((time: string) => {
+          defaultPrefs[time] = prefs[time] || ['linkedin', 'x', 'telegram']
+        })
+        setPlatformPreferences(defaultPrefs)
       }
     } catch (error) {
       console.error('Failed to fetch schedule:', error)
@@ -62,6 +74,7 @@ export default function SchedulePage() {
           frequency,
           image_generation_enabled: imageGenerationEnabled,
           image_times: imageTimes,
+          platform_preferences: platformPreferences,
         }),
       })
 
@@ -88,19 +101,68 @@ export default function SchedulePage() {
   }
 
   const addTime = () => {
-    setTimes([...times, '12:00'])
+    const newTime = '12:00'
+    setTimes([...times, newTime])
+    // Default new time slots to all platforms
+    setPlatformPreferences({
+      ...platformPreferences,
+      [newTime]: ['linkedin', 'x', 'telegram']
+    })
   }
 
   const updateTime = (index: number, value: string) => {
+    const oldTime = times[index]
     const newTimes = [...times]
     newTimes[index] = value
     setTimes(newTimes)
+    
+    // Update platform preferences with new time key
+    if (oldTime !== value && platformPreferences[oldTime]) {
+      const newPrefs = { ...platformPreferences }
+      newPrefs[value] = newPrefs[oldTime]
+      delete newPrefs[oldTime]
+      setPlatformPreferences(newPrefs)
+    }
   }
 
   const removeTime = (index: number) => {
     if (times.length > 1) {
+      const timeToRemove = times[index]
       setTimes(times.filter((_, i) => i !== index))
+      
+      // Remove from platform preferences
+      const newPrefs = { ...platformPreferences }
+      delete newPrefs[timeToRemove]
+      setPlatformPreferences(newPrefs)
     }
+  }
+
+  const togglePlatformForTime = (time: string, platform: Platform) => {
+    const currentPlatforms = platformPreferences[time] || []
+    const newPlatforms = currentPlatforms.includes(platform)
+      ? currentPlatforms.filter(p => p !== platform)
+      : [...currentPlatforms, platform]
+    
+    setPlatformPreferences({
+      ...platformPreferences,
+      [time]: newPlatforms
+    })
+  }
+
+  const toggleAllPlatformsForTime = (time: string, enable: boolean) => {
+    setPlatformPreferences({
+      ...platformPreferences,
+      [time]: enable ? ['linkedin', 'x', 'telegram'] : []
+    })
+  }
+
+  const isPlatformSelectedForTime = (time: string, platform: Platform): boolean => {
+    return platformPreferences[time]?.includes(platform) || false
+  }
+
+  const areAllPlatformsSelectedForTime = (time: string): boolean => {
+    const platforms = platformPreferences[time] || []
+    return platforms.length === 3
   }
 
   const addImageTime = (time: string) => {
@@ -256,6 +318,108 @@ export default function SchedulePage() {
           </p>
         </div>
 
+        {/* Platform Selection */}
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border-2 border-blue-200 dark:border-blue-800">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+              <span className="text-white text-xl">🎯</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                Platform Selection
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Choose which platforms to post to at each time slot
+              </p>
+            </div>
+          </div>
+          
+          {times.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400 italic">Add posting times above to configure platform selection.</p>
+          ) : (
+            <div className="space-y-4">
+              {times.map((time) => (
+                <div key={time} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-medium text-gray-900 dark:text-white">{time}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleAllPlatformsForTime(time, !areAllPlatformsSelectedForTime(time))}
+                      className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      {areAllPlatformsSelectedForTime(time) ? 'Deselect All' : 'Select All'}
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* LinkedIn */}
+                    <label className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-gray-800 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={isPlatformSelectedForTime(time, 'linkedin')}
+                        onChange={() => togglePlatformForTime(time, 'linkedin')}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">💼</span>
+                        <span className="font-medium text-gray-900 dark:text-white">LinkedIn</span>
+                      </div>
+                    </label>
+
+                    {/* X (Twitter) */}
+                    <label className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-gray-800 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={isPlatformSelectedForTime(time, 'x')}
+                        onChange={() => togglePlatformForTime(time, 'x')}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">𝕏</span>
+                        <span className="font-medium text-gray-900 dark:text-white">X</span>
+                      </div>
+                    </label>
+
+                    {/* Telegram */}
+                    <label className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-gray-800 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={isPlatformSelectedForTime(time, 'telegram')}
+                        onChange={() => togglePlatformForTime(time, 'telegram')}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">✈️</span>
+                        <span className="font-medium text-gray-900 dark:text-white">Telegram</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Warning if no platforms selected */}
+                  {platformPreferences[time]?.length === 0 && (
+                    <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-sm text-yellow-800 dark:text-yellow-200">
+                      ⚠️ No platforms selected. This time slot will be skipped.
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
+            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+              💡 Platform Selection Tips
+            </h3>
+            <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+              <li>Different platforms work best at different times</li>
+              <li>LinkedIn is most active during business hours</li>
+              <li>X (Twitter) has high engagement throughout the day</li>
+              <li>Telegram channels can be posted to anytime</li>
+              <li>By default, all platforms are selected for each time slot</li>
+            </ul>
+          </div>
+        </div>
+
         {/* Image Generation Settings */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border-2 border-purple-200 dark:border-purple-800">
           <div className="flex items-center justify-between mb-4">
@@ -357,7 +521,7 @@ export default function SchedulePage() {
           <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
             <li>Agent X checks the schedule every hour via cron job</li>
             <li>When autopilot is ON and it's time to post, a post is automatically generated</li>
-            <li>Posts are published to all connected accounts</li>
+            <li>Posts are published to selected platforms for each time slot</li>
             <li>You can view post history in the Posts page</li>
           </ul>
         </div>
@@ -375,5 +539,3 @@ export default function SchedulePage() {
     </div>
   )
 }
-
-
