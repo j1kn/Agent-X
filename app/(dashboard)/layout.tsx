@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { AutopilotToggle } from '@/components/AutopilotToggle'
+import { MobileNav } from '@/components/MobileNav'
+import { signOutAction } from './actions'
 
 export default async function DashboardLayout({
   children,
@@ -16,19 +18,12 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  async function signOut() {
-    'use server'
-    const supabase = await createClient()
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 shadow-sm">
+      <nav className="bg-white dark:bg-gray-800 shadow-sm relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex">
+            <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">Agent X</h1>
               </div>
@@ -77,9 +72,9 @@ export default async function DashboardLayout({
                 </Link>
               </div>
             </div>
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-4">
               <AutopilotToggle />
-              <form action={signOut}>
+              <form action={signOutAction} className="hidden sm:block">
                 <button
                   type="submit"
                   className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
@@ -87,6 +82,7 @@ export default async function DashboardLayout({
                   Sign out
                 </button>
               </form>
+              <MobileNav signOut={signOutAction} />
             </div>
           </div>
         </div>
