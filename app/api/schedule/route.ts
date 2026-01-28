@@ -40,8 +40,39 @@ export async function POST(request: Request) {
     frequency,
     timezone,
     image_generation_enabled,
-    image_times
+    image_times,
+    platform_preferences
   } = await request.json()
+
+  // Validate platform_preferences if provided
+  if (platform_preferences) {
+    if (typeof platform_preferences !== 'object' || Array.isArray(platform_preferences)) {
+      return NextResponse.json(
+        { error: 'platform_preferences must be an object' },
+        { status: 400 }
+      )
+    }
+    
+    // Validate each time slot has valid platforms
+    const validPlatforms = ['linkedin', 'x', 'telegram']
+    for (const [time, platforms] of Object.entries(platform_preferences)) {
+      if (!Array.isArray(platforms)) {
+        return NextResponse.json(
+          { error: `platform_preferences['${time}'] must be an array` },
+          { status: 400 }
+        )
+      }
+      
+      for (const platform of platforms as string[]) {
+        if (!validPlatforms.includes(platform)) {
+          return NextResponse.json(
+            { error: `Invalid platform: ${platform}. Must be one of: ${validPlatforms.join(', ')}` },
+            { status: 400 }
+          )
+        }
+      }
+    }
+  }
 
   const { error } = await supabase
     .from('schedule_config')
@@ -54,6 +85,7 @@ export async function POST(request: Request) {
       timezone: timezone || 'UTC',
       image_generation_enabled: image_generation_enabled || false,
       image_times: image_times || [],
+      platform_preferences: platform_preferences || {},
     }, {
       onConflict: 'user_id'
     })

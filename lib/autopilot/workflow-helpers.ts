@@ -6,10 +6,16 @@
  */
 
 import type { Database, Json } from '@/types/database'
+import type { Platform } from '@/lib/types/platform'
 
 type PipelineStep = Database['public']['Tables']['pipeline_logs']['Row']['step']
 type PipelineStatus = Database['public']['Tables']['pipeline_logs']['Row']['status']
 type PipelineLogInsert = Database['public']['Tables']['pipeline_logs']['Insert']
+
+// Platform preferences type
+export type PlatformPreferences = {
+  [timeSlot: string]: Platform[]
+}
 
 // Schedule configuration type
 export type ScheduleConfig = {
@@ -18,6 +24,7 @@ export type ScheduleConfig = {
   timezone: string | null
   image_generation_enabled?: boolean | null
   image_times?: string[] | null
+  platform_preferences?: PlatformPreferences | null
 }
 
 // Time match result type
@@ -167,4 +174,37 @@ export function shouldGenerateImageForTime(
 
   // Check if the matched time is in the image_times array
   return schedule.image_times.includes(matchedTime)
+}
+
+/**
+ * Get platforms to post to for a specific time slot
+ *
+ * @param schedule - User's schedule configuration
+ * @param matchedTime - The matched time from checkTimeMatch (e.g., "09:00")
+ * @returns Array of platforms to post to, or all platforms if not configured
+ */
+export function getPlatformsForTime(
+  schedule: ScheduleConfig,
+  matchedTime?: string
+): Platform[] {
+  // If no matched time, return empty array
+  if (!matchedTime) {
+    return []
+  }
+
+  // If platform_preferences not configured, default to all platforms
+  // This ensures backward compatibility for existing users
+  if (!schedule.platform_preferences) {
+    return ['linkedin', 'x', 'telegram']
+  }
+
+  // Get platforms for this specific time slot
+  const platforms = schedule.platform_preferences[matchedTime]
+
+  // If time slot not configured, default to all platforms
+  if (!platforms || platforms.length === 0) {
+    return ['linkedin', 'x', 'telegram']
+  }
+
+  return platforms
 }

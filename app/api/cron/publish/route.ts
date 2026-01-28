@@ -7,7 +7,7 @@ import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { publishToLinkedIn } from '@/lib/platforms/linkedin'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
-import { checkTimeMatch, logPipeline, extractRecentTopics, shouldGenerateImageForTime, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
+import { checkTimeMatch, logPipeline, extractRecentTopics, shouldGenerateImageForTime, getPlatformsForTime, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
 import { generateImageWithStability } from '@/lib/ai/providers/stability-image'
 import { uploadImageToStorage } from '@/lib/storage/image-upload'
 import type { PublishArgs } from '@/lib/pipeline/types'
@@ -155,10 +155,10 @@ async function autoGenerateAndPublish(): Promise<{
       console.log(`\n[Auto-Gen] Processing user: ${user.id}`)
       
       try {
-        // Get user's schedule configuration
+        // Get user's schedule configuration (including platform_preferences)
         const { data: scheduleData } = await supabase
           .from('schedule_config')
-          .select('days_of_week, times, timezone, image_generation_enabled, image_times')
+          .select('days_of_week, times, timezone, image_generation_enabled, image_times, platform_preferences')
           .eq('user_id', user.id)
           .single()
         
@@ -199,20 +199,31 @@ async function autoGenerateAndPublish(): Promise<{
         
         console.log(`[Auto-Gen] ✓ No duplicate found for time slot: ${timeSlot}`)
         
-        // Get connected accounts (X, Telegram, and LinkedIn)
+        // Get platforms to post to for this time slot (DYNAMIC SELECTION)
+        const platformsToPost = getPlatformsForTime(schedule, matchResult.matchedTime)
+        
+        if (platformsToPost.length === 0) {
+          console.log('[Auto-Gen] No platforms configured for this time slot')
+          results.push({ userId: user.id, status: 'skipped', error: 'No platforms configured' })
+          continue
+        }
+        
+        console.log(`[Auto-Gen] Platforms for ${matchResult.matchedTime}:`, platformsToPost)
+        
+        // Get connected accounts for selected platforms only
         const { data: accountsData } = await supabase
           .from('connected_accounts')
           .select('id, platform, access_token, platform_user_id, username, token_expires_at')
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .in('platform', ['x', 'telegram', 'linkedin'])
+          .in('platform', platformsToPost)
         
         const accounts = accountsData as ConnectedAccount[] | null
         
         if (!accounts || accounts.length === 0) {
-          console.log('[Auto-Gen] No active X, Telegram, or LinkedIn accounts')
-          await logPipeline(supabase, user.id, 'publishing', 'warning', 'No active accounts')
-          results.push({ userId: user.id, status: 'skipped', error: 'No accounts connected' })
+          console.log(`[Auto-Gen] No active accounts for platforms: ${platformsToPost.join(', ')}`)
+          await logPipeline(supabase, user.id, 'publishing', 'warning', 'No active accounts for selected platforms')
+          results.push({ userId: user.id, status: 'skipped', error: 'No accounts connected for selected platforms' })
           continue
         }
         
@@ -336,9 +347,23 @@ async function autoGenerateAndPublish(): Promise<{
         
         for (const account of accounts) {
           const platform = account.platform
-          const content = platform === 'x' ? variants.x :
-                         platform === 'telegram' ? variants.telegram :
-                         variants.linkedin
+          
+          // Select appropriate content variant for platform
+          let content: string
+          switch (platform) {
+            case 'x':
+              content = variants.x
+              break
+            case 'telegram':
+              content = variants.telegram
+              break
+            case 'linkedin':
+              content = variants.linkedin
+              break
+            default:
+              console.warn(`[Auto-Gen] Unknown platform: ${platform}`)
+              continue
+          }
           
           console.log(`[Auto-Gen] Publishing to ${platform} (${account.username})...`)
           

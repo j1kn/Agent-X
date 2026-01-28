@@ -375,6 +375,7 @@ export interface Database {
           timezone: string | null
           image_generation_enabled: boolean | null
           image_times: string[] | null
+          platform_preferences: Json | null
           created_at: string
           updated_at: string
         }
@@ -387,6 +388,7 @@ export interface Database {
           timezone?: string | null
           image_generation_enabled?: boolean | null
           image_times?: string[] | null
+          platform_preferences?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -399,6 +401,7 @@ export interface Database {
           timezone?: string | null
           image_generation_enabled?: boolean | null
           image_times?: string[] | null
+          platform_preferences?: Json | null
           created_at?: string
           updated_at?: string
         }
