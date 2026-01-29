@@ -16,7 +16,6 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { selectNextTopic, extractRecentTopics } from '@/lib/autopilot/topicSelector'
 import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
@@ -30,14 +29,13 @@ export const maxDuration = 60 // 60 seconds max execution
 // Define user profile type for autopilot (subset of user_profiles table)
 type UserProfileForAutopilot = Pick<
   Database['public']['Tables']['user_profiles']['Row'],
-  'id' | 'ai_provider' | 'topics' | 'tone'
+  'id' | 'ai_provider' | 'tone'
 > & {
   autopilot_enabled: boolean | null
 }
 
-// Define post type for recent posts query (topic field was added recently)
+// Define post type for recent posts query
 type RecentPost = {
-  topic: string | null
   content: string
 }
 
@@ -54,7 +52,7 @@ export async function POST(request: Request) {
     // Get all users with autopilot enabled
     const { data: users, error: usersError } = await supabase
       .from('user_profiles')
-      .select('id, ai_provider, topics, tone, autopilot_enabled')
+      .select('id, ai_provider, tone, autopilot_enabled')
       .eq('autopilot_enabled', true)
       .returns<UserProfileForAutopilot[]>()
     
@@ -104,26 +102,20 @@ export async function POST(request: Request) {
         // Get recent posts to avoid repetition
         const { data: recentPosts } = await supabase
           .from('posts')
-          .select('topic, content')
+          .select('content')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(10)
           .returns<RecentPost[]>()
         
-        const recentTopics = extractRecentTopics(recentPosts || [])
         const recentContents = (recentPosts || []).map(p => p.content)
         
-        // Select next topic intelligently
-        const { topic, reason } = await selectNextTopic(user.topics || [], recentTopics)
-        console.log(`Selected topic: "${topic}" - ${reason}`)
+        console.log('Generating content using full training data...')
+        await logPipeline(supabase, user.id, 'planning', 'success', 'Starting content generation with training data')
         
-        await logPipeline(supabase, user.id, 'planning', 'success', `Topic selected: ${topic}`, { topic, reason })
-        
-        // Generate content
-        console.log('Generating content...')
+        // Generate content - Claude will use full training data from Training section
         const { content, prompt, model } = await generateContent(user.id, {
-          topic,
-          tone: user.tone || 'professional',
+          tone: user.tone || undefined,
           recentPosts: recentContents,
         })
         
@@ -211,7 +203,6 @@ export async function POST(request: Request) {
                 platform_post_id: publishResult.postId,
                 generation_prompt: prompt,
                 generation_model: model,
-                topic,
               })
             
             if (postError) {
@@ -238,7 +229,6 @@ export async function POST(request: Request) {
                 platform: account.platform,
                 generation_prompt: prompt,
                 generation_model: model,
-                topic,
               })
           }
         }

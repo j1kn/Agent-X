@@ -3,11 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import { TrainingProfileV2, getSafeTrainingProfile } from '@/lib/types/training'
 
 export interface GenerateOptions {
-  topic: string
-  tone: string
+  tone?: string
   recentPosts?: string[]
   format?: string
   generateImagePrompt?: boolean
+  postIntent?: string // Optional short instruction like "announce new raffle"
 }
 
 export interface GenerateResult {
@@ -184,39 +184,70 @@ function buildPrompt(
   trainingInstructions?: string,
   trainingProfileV2?: TrainingProfileV2
 ): string {
-  const { topic, tone, recentPosts, format } = options
+  const { tone, recentPosts, format, postIntent } = options
 
   let prompt = ''
 
-  // Inject training instructions at the top if available (Agent X constitution)
+  // SYSTEM MESSAGE: Define Claude's role
+  prompt += `You are generating social media posts using the following training data.\n`
+  prompt += `This data defines brand identity, tone, structure, compliance, and image rules.\n`
+  prompt += `Follow it strictly. Do not invent missing data. If a section is empty, ignore it.\n\n`
+  prompt += '='.repeat(80) + '\n\n'
+
+  // TRAINING DATA PAYLOAD: Send full training context
   if (trainingInstructions && trainingInstructions.trim()) {
-    prompt += `AGENT X CONSTITUTION (follow these guidelines):\n${trainingInstructions}\n\n`
-    prompt += '---\n\n'
+    prompt += `--- TRAINING DATA ---\n\n`
+    prompt += `${trainingInstructions}\n\n`
   }
 
-  // Inject training_profile_v2 if available (additional structured context)
+  // Inject training_profile_v2 if available (structured sections)
   if (trainingProfileV2 && Object.keys(trainingProfileV2).length > 0) {
-    prompt += `ADDITIONAL STRUCTURED TRAINING CONTEXT (optional - use if relevant):\n`
+    prompt += `--- STRUCTURED TRAINING PROFILE ---\n\n`
     prompt += formatTrainingProfileV2(trainingProfileV2)
-    prompt += '\n---\n\n'
+    prompt += '\n'
   }
 
-  prompt += `Generate a social media post about "${topic}" with a ${tone} tone.`
+  // If no training data at all, provide fallback guidance
+  if ((!trainingInstructions || !trainingInstructions.trim()) &&
+      (!trainingProfileV2 || Object.keys(trainingProfileV2).length === 0)) {
+    prompt += `--- NO TRAINING DATA CONFIGURED ---\n\n`
+    prompt += `Generate a professional, engaging social media post.\n`
+    prompt += `Use best practices for social media content.\n\n`
+  }
+
+  prompt += '='.repeat(80) + '\n\n'
+
+  // POST GENERATION INSTRUCTIONS
+  prompt += `--- GENERATION TASK ---\n\n`
+  
+  if (postIntent) {
+    prompt += `Post Intent: ${postIntent}\n\n`
+  }
+
+  if (tone) {
+    prompt += `Tone: ${tone}\n`
+  }
 
   if (format) {
-    prompt += ` Use a ${format} format.`
+    prompt += `Format: ${format}\n`
   }
+
+  prompt += `\nGenerate a social media post following the training data above.`
 
   if (recentPosts && recentPosts.length > 0) {
-    prompt += `\n\nRecent posts (avoid repetition):\n${recentPosts.join('\n')}`
+    prompt += `\n\n--- RECENT POSTS (avoid repetition) ---\n${recentPosts.join('\n---\n')}`
   }
 
-  prompt += '\n\nGenerate only the post content, no explanations or meta-commentary. Keep it concise and engaging.'
-  prompt += '\n\nIMPORTANT: This content will be adapted for multiple platforms:'
-  prompt += '\n- X/Twitter (280 character limit)'
-  prompt += '\n- Telegram (4096 character limit)'
-  prompt += '\n- LinkedIn (3000 character limit, professional tone)'
-  prompt += '\n\nCreate content that works well when shortened for X but can also be expanded for LinkedIn. Aim for 200-500 characters as a good middle ground.'
+  prompt += '\n\n--- OUTPUT REQUIREMENTS ---\n'
+  prompt += '- Generate ONLY the post content, no explanations or meta-commentary\n'
+  prompt += '- Keep it concise and engaging\n'
+  prompt += '- This content will be adapted for multiple platforms:\n'
+  prompt += '  * X/Twitter (280 character limit)\n'
+  prompt += '  * Telegram (4096 character limit)\n'
+  prompt += '  * LinkedIn (3000 character limit, professional tone)\n'
+  prompt += '- Create content that works well when shortened for X but can also be expanded for LinkedIn\n'
+  prompt += '- Aim for 200-500 characters as a good middle ground\n'
+  prompt += '- Follow all compliance rules and restrictions from training data\n'
 
   return prompt
 }

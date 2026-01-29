@@ -134,17 +134,6 @@ export async function logPipeline(
   await supabase.from('pipeline_logs').insert(logEntry)
 }
 
-/**
- * Extract recent topics from posts to avoid repetition
- * 
- * @param posts - Array of recent posts with topic field
- * @returns Array of unique topics
- */
-export function extractRecentTopics(posts: Array<{ topic: string | null }>): string[] {
-  return posts
-    .map(p => p.topic)
-    .filter((topic): topic is string => topic !== null && topic.trim() !== '')
-}
 
 /**
  * Check if image generation should be enabled for the current time slot

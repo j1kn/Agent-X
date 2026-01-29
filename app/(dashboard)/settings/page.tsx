@@ -5,8 +5,6 @@ import { useEffect, useState } from 'react'
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [topics, setTopics] = useState<string[]>([])
-  const [newTopic, setNewTopic] = useState('')
   const [tone, setTone] = useState('')
   const [frequency, setFrequency] = useState<'daily' | 'twice_daily' | 'weekly'>('daily')
   const [success, setSuccess] = useState(false)
@@ -28,7 +26,6 @@ export default function SettingsPage() {
       const data = await response.json()
 
       if (data.profile) {
-        setTopics(data.profile.topics || [])
         setTone(data.profile.tone || '')
         setFrequency(data.profile.posting_frequency || 'daily')
         // Don't set the actual key, just show if it exists
@@ -54,7 +51,6 @@ export default function SettingsPage() {
 
     try {
       const payload = {
-        topics,
         tone,
         posting_frequency: frequency,
         gemini_api_key: geminiApiKey || null,
@@ -80,17 +76,6 @@ export default function SettingsPage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  const addTopic = () => {
-    if (newTopic.trim() && !topics.includes(newTopic.trim())) {
-      setTopics([...topics, newTopic.trim()])
-      setNewTopic('')
-    }
-  }
-
-  const removeTopic = (topic: string) => {
-    setTopics(topics.filter(t => t !== topic))
   }
 
   if (loading) {
@@ -245,56 +230,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Topics */}
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-            Topics
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Add topics that Agent X will post about. The autopilot will rotate through these intelligently.
-          </p>
-          <div className="space-y-4">
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                value={newTopic}
-                onChange={(e) => setNewTopic(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTopic())}
-                className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                placeholder="e.g., AI automation, developer productivity"
-              />
-              <button
-                type="button"
-                onClick={addTopic}
-                className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-              >
-                Add
-              </button>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {topics.length === 0 && (
-                <p className="text-sm text-gray-500">No topics added yet. Add at least one topic for autopilot to work.</p>
-              )}
-              {topics.map((topic) => (
-                <span
-                  key={topic}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-200"
-                >
-                  {topic}
-                  <button
-                    type="button"
-                    onClick={() => removeTopic(topic)}
-                    className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full text-indigo-600 hover:bg-indigo-200 dark:text-indigo-400 dark:hover:bg-indigo-800"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {/* Tone & Frequency */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
@@ -352,33 +287,25 @@ export default function SettingsPage() {
               </span>
             </li>
             <li className="flex items-center space-x-2">
-              <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs ${topics.length > 0 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                {topics.length > 0 ? '✓' : '2'}
-              </span>
-              <span className={topics.length > 0 ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}>
-                Add at least one topic
+              <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">2</span>
+              <span className="text-gray-600 dark:text-gray-400">
+                <a href="/training" className="text-indigo-600 hover:text-indigo-500">Configure training</a> (define brand voice, topics, and guidelines)
               </span>
             </li>
             <li className="flex items-center space-x-2">
               <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">3</span>
               <span className="text-gray-600 dark:text-gray-400">
-                <a href="/accounts" className="text-indigo-600 hover:text-indigo-500">Connect social accounts</a> (X, Telegram)
+                <a href="/accounts" className="text-indigo-600 hover:text-indigo-500">Connect social accounts</a> (X, Telegram, LinkedIn)
               </span>
             </li>
             <li className="flex items-center space-x-2">
               <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">4</span>
               <span className="text-gray-600 dark:text-gray-400">
-                <a href="/training" className="text-indigo-600 hover:text-indigo-500">Configure training</a> (optional requirements)
-              </span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">5</span>
-              <span className="text-gray-600 dark:text-gray-400">
                 <a href="/schedule" className="text-indigo-600 hover:text-indigo-500">Configure schedule</a> (days & times)
               </span>
             </li>
             <li className="flex items-center space-x-2">
-              <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">6</span>
+              <span className="w-5 h-5 flex items-center justify-center rounded-full text-xs bg-gray-100 text-gray-400">5</span>
               <span className="text-gray-600 dark:text-gray-400">
                 Turn on Autopilot (toggle in top navigation)
               </span>

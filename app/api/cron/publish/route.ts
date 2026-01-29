@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { publishScheduledPosts } from '@/lib/pipeline/publisher'
-import { selectNextTopic } from '@/lib/autopilot/topicSelector'
 import { generateContent } from '@/lib/ai/generator'
 import { publishToX } from '@/lib/platforms/x'
 import { publishToTelegram } from '@/lib/platforms/telegram'
 import { publishToLinkedIn } from '@/lib/platforms/linkedin'
 import { createPlatformVariants } from '@/lib/platforms/transformers'
-import { checkTimeMatch, logPipeline, extractRecentTopics, shouldGenerateImageForTime, getPlatformsForTime, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
+import { checkTimeMatch, logPipeline, shouldGenerateImageForTime, getPlatformsForTime, type ScheduleConfig } from '@/lib/autopilot/workflow-helpers'
 import { generateImageWithStability } from '@/lib/ai/providers/stability-image'
 import { uploadImageToStorage } from '@/lib/storage/image-upload'
 import type { PublishArgs } from '@/lib/pipeline/types'
@@ -26,7 +25,6 @@ type WorkflowStatus = Database['public']['Tables']['workflow_runs']['Row']['stat
 // Types for database queries
 type UserProfile = {
   id: string
-  topics: string[] | null
   tone: string | null
   autopilot_enabled: boolean | null
 }
@@ -41,7 +39,6 @@ type ConnectedAccount = {
 }
 
 type RecentPost = {
-  topic: string | null
   content: string
 }
 
@@ -135,7 +132,7 @@ async function autoGenerateAndPublish(): Promise<{
     // Step 1: Get all users with autopilot enabled
     const { data: users, error: usersError } = await supabase
       .from('user_profiles')
-      .select('id, topics, tone, autopilot_enabled')
+      .select('id, tone, autopilot_enabled')
       .eq('autopilot_enabled', true)
     
     if (usersError) {
@@ -230,30 +227,25 @@ async function autoGenerateAndPublish(): Promise<{
         // Get recent posts to avoid repetition
         const { data: recentPostsData } = await supabase
           .from('posts')
-          .select('topic, content')
+          .select('content')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(10)
         
         const recentPosts = recentPostsData as RecentPost[] | null
-        const recentTopics = extractRecentTopics(recentPosts || [])
         const recentContents = (recentPosts || []).map(p => p.content)
         
-        // Select topic
-        const { topic, reason } = await selectNextTopic(user.topics || [], recentTopics)
-        console.log(`[Auto-Gen] Selected topic: "${topic}" - ${reason}`)
-        
-        await logPipeline(supabase, user.id, 'planning', 'success', `Topic selected: ${topic}`, { topic, reason })
+        console.log('[Auto-Gen] Generating content using full training data...')
+        await logPipeline(supabase, user.id, 'planning', 'success', 'Starting content generation with training data')
         
         // Check if we should generate an image for this time slot
         const shouldGenerateImage = shouldGenerateImageForTime(schedule, matchResult.matchedTime)
         console.log(`[Auto-Gen] Image generation: ${shouldGenerateImage ? 'ENABLED' : 'DISABLED'} for time ${matchResult.matchedTime}`)
         
-        // Generate content with Claude (and image prompt if needed)
+        // Generate content with Claude - uses full training data from Training section
         console.log('[Auto-Gen] Generating content with Claude...')
         const result = await generateContent(user.id, {
-          topic,
-          tone: user.tone || 'professional',
+          tone: user.tone || undefined,
           recentPosts: recentContents,
           generateImagePrompt: shouldGenerateImage,
         })
@@ -423,7 +415,6 @@ async function autoGenerateAndPublish(): Promise<{
               },
               image_url: imageUrl || null,
               image_data: imageData || null,
-              topic,
             }
             await supabase.from('posts').insert(publishedPost)
             
@@ -457,7 +448,6 @@ async function autoGenerateAndPublish(): Promise<{
               },
               image_url: imageUrl || null,
               image_data: imageData || null,
-              topic,
             }
             await supabase.from('posts').insert(failedPost)
           }

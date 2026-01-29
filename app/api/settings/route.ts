@@ -5,7 +5,6 @@ export const runtime = 'nodejs'
 
 // Define types for query results
 type UserProfile = {
-  topics: string[] | null
   tone: string | null
   posting_frequency: string | null
   gemini_api_key: string | null
@@ -23,7 +22,7 @@ export async function GET() {
 
   const { data: profileData, error } = await supabase
     .from('user_profiles')
-    .select('topics, tone, posting_frequency, gemini_api_key, stability_api_key')
+    .select('tone, posting_frequency, gemini_api_key, stability_api_key')
     .eq('id', user.id)
     .single()
 
@@ -40,7 +39,6 @@ export async function GET() {
 
   return NextResponse.json({
     profile: profile ? {
-      topics: profile.topics,
       tone: profile.tone,
       posting_frequency: profile.posting_frequency,
       gemini_api_key: profile.gemini_api_key ? '••••••••' : null, // Mask the key
@@ -62,12 +60,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Accept topics, tone, posting_frequency, gemini_api_key, and stability_api_key
-  const { topics, tone, posting_frequency, gemini_api_key, stability_api_key } = await request.json()
+  // Accept tone, posting_frequency, gemini_api_key, and stability_api_key
+  const { tone, posting_frequency, gemini_api_key, stability_api_key } = await request.json()
 
   const updateData: Record<string, unknown> = {}
 
-  if (topics) updateData.topics = topics
   if (tone) updateData.tone = tone
   if (posting_frequency) updateData.posting_frequency = posting_frequency
   if (gemini_api_key !== undefined) updateData.gemini_api_key = gemini_api_key
