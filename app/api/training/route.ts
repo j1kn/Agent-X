@@ -14,7 +14,7 @@ export async function GET() {
 
   const { data: profile, error } = await supabase
     .from('user_profiles')
-    .select('training_instructions')
+    .select('training_instructions, training_profile_v2')
     .eq('id', user.id)
     .single()
 
@@ -34,15 +34,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { training_instructions } = await request.json()
+  const body = await request.json()
+  const { training_instructions, training_profile_v2 } = body
+
+  // Build update object - only include fields that are provided
+  const updateData: Record<string, unknown> = {
+    id: user.id,
+  }
+
+  // Always allow updating training_instructions (existing field)
+  if (training_instructions !== undefined) {
+    updateData.training_instructions = training_instructions
+  }
+
+  // Only include training_profile_v2 if explicitly provided
+  if (training_profile_v2 !== undefined) {
+    // Validate structure if provided (basic type checking)
+    if (training_profile_v2 !== null && typeof training_profile_v2 !== 'object') {
+      return NextResponse.json(
+        { error: 'training_profile_v2 must be an object or null' },
+        { status: 400 }
+      )
+    }
+    updateData.training_profile_v2 = training_profile_v2
+  }
 
   const { error } = await supabase
     .from('user_profiles')
     // @ts-expect-error - Supabase upsert type inference issue
-    .upsert({
-      id: user.id,
-      training_instructions,
-    }, {
+    .upsert(updateData, {
       onConflict: 'id'
     })
 
