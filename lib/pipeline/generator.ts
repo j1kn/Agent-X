@@ -29,11 +29,12 @@ export interface GenerationResult {
 /**
  * Generate ONE master post with Claude, then create platform variants
  * and schedule them for all connected accounts
+ *
+ * Now uses full training data instead of topic parameter
  */
 export async function generatePost(
   userId: string,
-  topic: string,
-  options?: { shouldGenerateImage?: boolean; currentTime?: string }
+  options?: { shouldGenerateImage?: boolean; currentTime?: string; postIntent?: string }
 ): Promise<GenerationResult> {
   const supabase = await createClient()
 
@@ -45,7 +46,7 @@ export async function generatePost(
     .single()
 
   // @ts-expect-error - Profile type inference issue
-  const tone = profile?.tone || 'professional'
+  const tone = profile?.tone || undefined
   // @ts-expect-error - Profile type inference issue
   const geminiApiKey = profile?.gemini_api_key
 
@@ -59,11 +60,11 @@ export async function generatePost(
 
   const recentContent = recentPosts?.map((p: { content: string }) => p.content) || []
 
-  // 3. Generate MASTER content using Claude (ONE call)
+  // 3. Generate MASTER content using Claude - uses full training data
   const { content: masterContent, prompt, model } = await generateContent(userId, {
-    topic,
     tone,
     recentPosts: recentContent,
+    postIntent: options?.postIntent,
   })
 
   // 4. Create platform-specific variants (deterministic, no AI calls)

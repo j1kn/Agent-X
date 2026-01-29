@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { planNextPost } from '@/lib/pipeline/planner'
 import { generatePost } from '@/lib/pipeline/generator'
 
 export const runtime = 'nodejs'
@@ -15,21 +14,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Plan next post (just to get topic)
-    const plan = await planNextPost(user.id)
-
     // Log planning success
     // @ts-ignore - Supabase type inference issue
     await supabase.from('pipeline_logs').insert({
       user_id: user.id,
       step: 'planning',
       status: 'success',
-      message: `Planned post for topic: ${plan.topic}`,
-      metadata: { topic: plan.topic },
+      message: 'Starting post generation using training data',
+      metadata: { withImage: false },
     })
 
     // Generate master post + platform variants + schedule all
-    const result = await generatePost(user.id, plan.topic)
+    const result = await generatePost(user.id)
 
     // Log generation success with all posts
     // @ts-ignore - Supabase type inference issue

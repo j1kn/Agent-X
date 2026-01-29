@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { planNextPost } from '@/lib/pipeline/planner'
 import { generatePost } from '@/lib/pipeline/generator'
 import { generateContent } from '@/lib/ai/generator'
 import { generateImageWithStability } from '@/lib/ai/providers/stability-image'
@@ -19,17 +18,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Plan next post (get topic)
-    const plan = await planNextPost(user.id)
-
     // Log planning success
     // @ts-ignore - Supabase type inference issue
     await supabase.from('pipeline_logs').insert({
       user_id: user.id,
       step: 'planning',
       status: 'success',
-      message: `Planned post with image for topic: ${plan.topic}`,
-      metadata: { topic: plan.topic, withImage: true },
+      message: 'Starting post generation with image using training data',
+      metadata: { withImage: true },
     })
 
     // Get user profile for tone
@@ -50,12 +46,11 @@ export async function POST(request: Request) {
     // @ts-expect-error - Type inference issue
     const recentContents = (recentPosts || []).map(p => p.content)
 
-    // Generate content with image prompt
+    // Generate content with image prompt - uses full training data
     console.log('[Generate with Image] Generating content and image prompt...')
     const contentResult = await generateContent(user.id, {
-      topic: plan.topic,
       // @ts-expect-error - Type inference issue
-      tone: profile?.tone || 'professional',
+      tone: profile?.tone || undefined,
       recentPosts: recentContents,
       generateImagePrompt: true, // Request image prompt
     })
@@ -117,7 +112,7 @@ export async function POST(request: Request) {
     })
 
     // Generate and schedule posts (this will create the posts in DB)
-    const result = await generatePost(user.id, plan.topic, {
+    const result = await generatePost(user.id, {
       shouldGenerateImage: true,
     })
 
